@@ -1,0 +1,292 @@
+Kafka原理篇
+
+## 概述
+Kafka 凭借「高性能」、「高吞吐」、「高可用」、「低延迟」、「可伸缩」几大特性，成为「消息队列」的首选。
+
+1. 高性能：以时间复杂度为 O(1) 的方式提供消息持久化能力，即使对TB级以上数据也能保证常数时间的访问性能。
+2. 高吞吐、低延迟：在非常廉价的机器上也能做到单机支持每秒几十万条消息的传输，并保持毫秒级延迟。
+3. 持久性、可靠性：消息最终被持久化到磁盘，且提供数据备份机制防止数据丢失。
+4. 容错性：支持集群节点故障容灾恢复，即使 Kafka 集群中的某一台 Kafka 服务节点宕机，也不会影响整个系统的功能（若副本数量为N， 则允许N-1台节点故障）。
+5. 高并发：可以支撑数千个客户端同时进行读写操作。
+
+主要应用场景：
+1. 日志收集：可以用 Kafka 来收集各种服务的 log，然后统一输出，比如日志系统 elk，用 Kafka 进行数据中转。
+2. 信息传递：比如订单信息传递，主要解决系统解耦，流量消峰，消息缓冲、可伸缩性、容错性，同时兼顾了信息的顺序性保障和消息回溯。
+3. 大数据实时计算: Kafka 提供了一套完整的流式处理框架， 被广泛应用到大数据处理，如与 flink、spark、storm 等整合。
+
+Kafka 核心组件的基础概念：
+1. Producer: 消息生产者，向broker发生消息。
+2. Consumer：信息消费者，从 Kafka Broker 读消息的客户端。
+3. Consumer Group: 消费者组，多个消费者构成一个消费组，消费组里面的每个消费者都只消费一个分区。不同的消费组之间不相互影响。
+4. Broker：一台KafKa的服务节点。一个集群是由1个或者多个 Broker 组成的，且一个 Broker 可以容纳多个 Topic。
+5. Topic： 消息分类，比如订单类，餐厅类，商品类等，同一个 Topic 下的 Partition 的消息内容是不相同的。
+6. Partition：为了实现 Topic 扩展性，提高并发能力，一个非常大的 Topic 可以分布到多个 Broker 上，一个 Topic 可以分为多个 Partition 进行存储，且每个 Partition 是消息内容是有序的。
+6. Replica: 副本，为实现数据备份的功能，保证集群中的某个节点发生故障时，该节点上的 Partition 数据不丢失，且 Kafka 仍然能够继续工作，为此 Kafka 提供了副本机制，一个 Topic 的每个 Partition 都有若干个副本，一个 Leader 副本和若干个 Follower 副本。
+7. Leader：即每个分区多个副本的主副本，生产者发送数据的对象，以及消费者消费数据的对象，都是 Leader。注意broker和Leader的区别， Leader只是broker上面Patition的特殊称谓，并不是一个独立的组件。也就是说broker上面的partition有的是Leader，有的是Follwer。
+8. Follower：即每个分区多个副本的从副本，会实时从 Leader 副本中同步数据，并保持和 Leader 数据的同步。Leader 发生故障时，某个 Follower 还会被选举并成为新的 Leader , 且不能跟 Leader 在同一个 Broker 上, 防止崩溃数据可恢复。
+9. Offset：消费者消费的位置信息，监控数据消费到什么位置，当消费者挂掉再重新恢复的时候，可以从消费位置继续消费。
+
+值得注意的是Consumer Group的里面的Consumer的个数必须和对应的Topic的Partiton个数保持一致，因为他们是一一对应的。
+
+
+## 存储机制
+消息是通过topic来分类的，为了避免topic的数据过大，通过partition的方式分解一个大的topic。
+
+每个partiton对应一个log文件，该 log 文件中存储的就是 Producer 生产的数据，Producer 端生产的数据会不断顺序追加到该 log 文件末尾，并且每条数据都会记录有自己的 Offset。
+
+而消费者组中的每个消费者，也都会实时记录当前自己消费到了哪个 Offset，方便在崩溃恢复时，可以继续从上次的 Offset 位置消费。
+
+此时 Producer 端生产的消息会不断追加到 log 文件末尾，这样文件就会越来越大, 为了防止 log 文件过大导致数据定位效率低下，那么Kafka 采取了分片和索引机制。
+
+一个log被分成多个segment文件，每个 Segment 对应4个文件：“.index” 索引文件, “.log” 数据文件,  “.snapshot” 快照文件,  “.timeindex” 时间索引文件。
+
+这些文件都位于同一文件夹下面，该文件夹的命名规则为：topic 名称-分区号。例如, heartbeat心跳上报服务 这个 topic 有三个分区，则其对应的文件夹为 heartbeat-0，heartbeat-1，heartbeat-2这样。
+
+index, log, snapshot, timeindex 文件以当前 Segment 的第一条消息的 Offset 命名。其中 “.index” 文件存储大量的索引信息，“.log” 文件存储大量的数据。
+
+首先会查找index文件确定消息在log的位置，然后通过offset偏移量查找到对应的真正的消息。
+
+## 生产者发送消息时如何选择分区的
+
+1. 轮询策略：顺序分配消息，即按照消息顺序依次发送到某Topic下不同的分区，它总是能保证消息最大限度地被平均分配到所有分区上，如果消息在创建的时候 key 为 null， 那么Kafka 默认会采用这种策略。
+
+2. 消息key指定分区策略：Kafka 允许为每条消息定义 key，即消息在创建的时候 key 不为空，此时 Kafka 会根据消息的 key 进行 hash, 然后根据 hash 值对 Partition 进行取模映射到指定的分区上， 这样的好处就是相同 key的消息会发送到同一个分区上， 这样 Kafka 虽然不能保证全局有序，但是可以保证每个分区的消息是有序的，这就是消息分区有序性，适应场景有下单支付的时候希望消息有序，可以通过订单 id 作为 key 发送消息达到分区有序性
+
+3. 随机策略：随机发送到某个分区上，看似也是将消息均匀打散分配到各个分区，但是性能还是无法跟轮询策略比，「如果追求数据的均匀分布，最好还是使用轮询策略」。
+
+4. 自定义策略
+
+## Kafka 如何合理设置分区数越多越好吗
+
+合适的 Partition 数量可以达到并行读写和负载均衡的目的。
+
+确定分区数的基本逻辑为：
+1. 首先根据某个 Topic 当前接收的数据量等经验来确定分区的初始值。
+2. 然后针对这个 Topic，进行测试 Producer 端吞吐量和 Consumer 端的吞吐量。
+3. 假设此时他们的值分别是 Tp「Producer 端吞吐量」、Tc「负Consumer 端吞吐量」，总的目标吞吐量是 Tt， 单位是 MB/s， 那么结果 numPartition = Tt / max (Tp, Tc)。
+
+
+理论上说， partition越多，并发就可以越大，消费的越快，也就是吞吐量越大。
+
+内存方面：
+Producer端：比如参数 batch.size，默认是16KB。它会为每个分区缓存消息，在数据积累到一定大小或者足够的时间时，累积的消息将会从缓存中移除并发往Broker 节点。这个功能是为了提高性能而设计，但是随着分区数增多，这部分缓存所需的内存占用也会更多。
+
+Consumer端：消费者数跟分区数是直接挂钩的，在消费消息时的内存占用、以及为达到更高的吞吐性能需要开启的 Consumer 数也会随着分区数增加而增加。
+
+消耗文件句柄：
+在 Kafka 的 Broker 中，每个 Partition 都会对应磁盘文件系统中一个目录。在 Kafka 的日志文件目录中，每个日志数据段都会分配三个文件，两个索引文件和一个数据文件。
+
+Broker 会为每个日志段文件打开两个 index 文件句柄和一个 log 数据文件句柄。
+
+如果partition越大，broker上面的partition对应的文件就越多，broker消耗的文件句柄就越多，最终可能超过底层操作系统配置的文件句柄数量限制。
+
+端到端的延迟方面分析：
+
+如果分区越多，那么副本之间需要同步的数据就会越多，假如消息需要在所有 ISR 副本集合列表同步复制完成之后才能进行暴露。
+因此 ISR 副本集合间复制数据所花时间将是 kafka 端对端延迟的最主要部分。
+
+经验是：单个 Broker 节点 Partition 的 Leader 数量不超过100。
+
+
+
+
+
+## Replica - 副本
+kafka中的 Partition 为了保证数据安全，每个 Partition 可以设置多个副本。在创建主题的时候可使用replication-factor参数指定分区的副本个数。
+
+此时我们对分区0,1,2分别设置3个副本（注:设置两个副本是比较合适的）。而且每个副本都是有"角色"之分的，它们会选取一个副本作为 Leader 副本，而其他的作为 Follower 副本，我们的 Producer 端在发送数据的时候，只能发送到Leader Partition里面 ，然后Follower Partition会去Leader那自行同步数据, Consumer 消费数据的时候，也只能从 Leader 副本那去消费数据的。
+
+当 Leader 副本不可用时，其中一个 Follower 将会被选举并成为新的 Leader。
+
+那如果Follower副本还没有同步Leader副本的数据时，Leader副本所在的broker就挂了，此时岂不是要丢失数据？
+
+为了解决这个问题，KafKa设计了ISR(In_Sync_Replica)机制。
+
+如上图所示, 每个分区都有一个 ISR(in-sync Replica) 列表，用于维护所有同步的、可用的副本。
+
+而对于 Follower 副本来说，它需要满足以下条件才能被认为是同步副本：
+1. 必须定时向 Zookeeper 发送心跳；
+2. 在规定的时间内从 Leader 副本 "低延迟" 地获取过消息。
+
+如果副本不满足上面条件的话，就会被从 ISR 列表中移除，直到满足条件才会被再次加入。所以就可能会存在 Follower 不可能与 Leader 实时同步的风险。
+Kafka 判断 Follower 是否与 Leader 同步的条件就是 Broker 端参数 replica.lag.time.max.ms 参数值。
+ 这个参数的含义就是 Follower 副本能够落后 Leader 副本的最长时间间隔, 当前默认值为10秒, 也就是说, 只要一个Follower 副本落后 Leader 副本的时间不连续超过10秒, Kafka 就认为两者是同步的, 即使 Follower 副本中保持的消息要少于 Leader 副本中的消息。
+
+注意 ISR集合里面的数据是最大可能接近Leader的，但不是100%相同，如果要实现100%相同，可以配置replica.lag.time.max.ms参数。
+
+
+
+
+
+## 消息发送
+
+1. 只管发：它只管发送消息，并不需要关心消息是否发送成功。其本质上也是一种异步发送的方式，消息先存储在缓冲区中，达到设定条件后再批量进行发送。
+2. 同步发送：必须等待消息发送成功后才发送下一条数据。
+3. 异步发送: 发送后注册一个callback, 当 Broker 接收到返回的时候，该 callback 函数会被触发执行，通过回调函数能够对异常情况进行处理，当调用了回调函数时，只有回调函数执行完毕生产者才会结束，否则一直会阻塞。
+
+异步发送不保证消息的有序性，如果业务需要知道消息是否发送成功，但对消息的顺序并不关心的话，那么可以用「异步async + 回调 callback 函数」的方式来发送消息，并配合参数 retries=0，待发送失败时将失败的消息记录到日志文件中进行后续处理。
+
+
+
+Kafka Producer通过ack这个参数来控制发送策略。
+
+ack=0，那么 Producer 是不会等待 Broker 的反馈。该消息会被立刻添加到 Socket Buffer 中就认为已经发送完成。在这种情况下，服务器端是否收到请求是无法保证的，并且参数 Retries 也不会生效。
+
+这种情况只在乎吞吐量，允许消息失败可以在收集日志的场景上使用。
+
+ack=1，这个时候 Leader 节点会将记录先写入本地日志，并且在所有 Follower 节点反馈之前就先确认成功。
+在这种情况下，如果 Leader 节点在接收记录之后，并且在 Follower 节点复制数据完成之前发生错误，那么这条记录会丢失。
+
+
+ack=all，这个时候 Leader 节点会等待所有同步中的LSR副本确认之后再确认这条记录是否发送完成。只要至少有一个同步副本存在，记录就不会丢失。
+
+Broker有个配置项min.insync.replicas(默认值为1)代表了正常写入生产者数据所需要的最少ISR个数,  当ISR中的副本数量小于min.insync.replicas时，Leader停止写入生产者生产的消息，并向生产者抛出NotEnoughReplicas异常，阻塞等待更多的 Follower 赶上并重新进入ISR,  因此能够容忍min.insync.replicas-1个副本同时宕机。
+
+如果业务要求消息必须是按顺序发送的话，且数据只能落在一个 Partition 上，那么可以使用同步发送「sync」的方式，并结合参数来设置 retries 的值让消息发送失败时可以进行多次重试。
+
+
+## 如何保证 Kafka 中的消息是有序的？
+
+为了保证消息有序，必须生成和消费都是有序的。
+
+###  生产端 Producer 保证数据有序。
+
+首先 Kafka 的 Producer 端发送消息，如果是不对默认参数进行任何设置且网络没有抖动的情况下，消息是可以一批批的按消息发送的顺序被发送到 Kafka Broker 端。但是，一旦有网络波动了，则消息就可能出现乱序。
+
+要严格保证 Kafka 发消息有序，首先要考虑用同步的方式来发送消息：
+
+1. 配置ack=all和max.in.flight.requests.per.connection = 1， 这样只有消息发送成功后，才会生产下一条信息。
+
+通过上面方式还可能出现消息重发和幂等问题:
+
+1. 重发问题：Kafka 在消息发送出现问题时，通过判断是否可以自动重试恢复，如果是可以自动恢复的问题，设置 retries > 0，让 Kafka 自动重试。
+2. 幂等问题： 设置enable.idempotence = true,  幂等特性可以给消息添加序列号，即每次发送会把序列号递增 1。
+
+这样当 Kafka 发消息的时候，由于消息有了序列号， 当发送消息出现错误的时候， Kafka 底层会通过获取服务器端的最近几条日志的序列号和发送端需要重新发送的消息序列号做对比，如果是连续的，那么就可以继续发送消息，保证消息顺序。
+
+### 服务端 Broker
+
+Kafka 只保证单分区内的消息是有序的，所以如果要保证业务全局严格有序，就要设置 Topic 为单分区的方式。不过对业务来说一般不需要考虑全局有序的，只需要保证业务中不同类别的消息有序即可。
+
+
+
+### 消费端 Consumer
+
+在 Consumer 端，根据 Kafka 的模型，一个 Topic 下的每个分区只能从属于这个 Topic 的消费者组中的某一个消费者。
+当消息被发送分配到同一个 Partition 中，消费者从 Partition 中取出来数据的时候，也一定是有顺序的，没有错乱。
+但是消费者可能会有多个线程来并发来消费消息。如果单线程消费数据，吞吐量太低了，而多个线程并发消费的话，顺序可能就乱掉了。
+
+此时可以通过写多个内存队列，将相同 key 的消息都写入同一个队列，然后对于多个线程，每个线程分别消息一个队列即可保证消息顺序。
+
+
+
+## 日志删除
+
+1. 基于时间策略：日志删除任务会周期检查当前日志文件中是否有保留时间超过设定的阈值(retentionMs) 来寻找可删除的日志段文件集合(deletableSegments)。将日志段所对应的所有文件，包括索引文件都添加上“.deleted”的后缀。最后删除.deleted后缀的文件。
+
+2. 基于日志大小策略： 日志删除任务会周期检查当前日志大小是否超过设定的阈值(retentionSize) 来寻找可删除的日志段文件集合(deletableSegments)。
+
+3. 基于日志起始偏移量
+
+
+## Kafka中Offset的作用是什么,如何进行维护？
+
+在 Kafka 中每个 Topic 分区下面的每条消息都被赋予了一个唯一的ID值，用来标识它在分区中的位置。
+这个ID值就被称为位移「Offset」或者叫偏移量，一旦消息被写入到日志分区中，它的位移值将不能被修改。
+
+Kafka 旧版本（0.9版本之前）是把位移保存在 ZooKeeper 中，减少 Broker 端状态存储开销。
+
+
+### __consumer_offsets的价值
+
+鉴于 Zookeeper 不适合频繁写更新，而 Consumer Group 的位移提交又是高频写操作，这样会拖慢 ZooKeeper 集群的性能， 于是在新版 Kafka 中， 社区采用了将位移保存在 Kafka 内部「Kafka Topic 天然支持高频写且持久化」，这就是所谓大名鼎鼎的__consumer_offsets。
+
+__consumer_offsets：用来保存 Kafka Consumer 提交的位移信息，另外它是由 Kafka 自动创建的，和普通的 Topic 相同，它的消息格式也是 Kafka 自己定义的，我们无法进行修改
+
+__consumer_offsets 有3种消息格式：
+
+1）用来保存 Consumer Group 信息的消息。
+
+2）用来删除 Group 过期位移甚至是删除 Group 的消息，也可以称为 tombstone 消息，即墓碑消息，它的主要特点是空消息体，一旦某个 Consumer Group 下的所有Consumer 位移数据都已被删除时，Kafka会向 __consumer_offsets 主题的对应分区写入 tombstone 消息，表明要彻底删除这个 Group 的信息。
+
+3)  用来保存位移值。
+
+__consumer_offsets 消息格式分析揭秘：
+
+1. 消息格式我们可以简单理解为是一个 KV 对。Key 和 Value 分别表示消息的键值和消息体。
+
+2. 那么 Key 存什么呢？既然是存储 Consumer 的位移信息，在 Kafka 中，Consumer 数量会很多，必须有字段来标识位移数据是属于哪个 Consumer 的，怎么来标识 Consumer 字段呢？我们知道 Consumer Group 会共享一个公共且唯一的 Group ID，那么只保存它就可以了吗？
+
+我们知道 Consumer 提交位移是在分区的维度进行的，很显然，key中还应该保存 Consumer 要提交位移的分区。
+
+因为分区和Consumer是一一对应的，所以记录分区号即可，不能记录Consumer，因为Consumer可能会被迁移。
+
+3. 总结：位移主题的 Key 中应该保存 3 部分内容：<Group ID，主题名，分区号>
+4. value 可以简单认为存储的是 offset 值，当然底层还存储其他一些元数据，帮助 Kafka 来完成一些其他操作，比如删除过期位移数据等。
+
+### __consumer_offsets 创建
+
+__consumer_offsets 是怎么被创建出来的呢？ 当 Kafka 集群中的第一个 Consumer 启动时，Kafka 会自动创建__consumer_offsets。
+它就是普通的 Topic，也有对应的分区数，如果由 Kafka 自动创建的，那么分区数又是怎么设置的呢？
+
+这个依赖 Broker 端参数主题分区位移个数即「offsets.topic.num.partitions」 默认值是50，因此 Kafka 会自动创建一个有 50 个分区的 __consumer_offsets 。既然有分区数，必然就会有分区对应的副本个数，这个是依赖Broker 端另外一个参数来完成的，即 「offsets.topic.replication.factor」默认值为3。
+
+
+总结一下， __consumer_offsets 由 Kafka 自动创建的，那么该 Topic 的分区数是 50，副本数是 3，而具体 Consumer Group 的消费情况要存储到哪个 Partition ，根据abs(GroupId.hashCode()) % NumPartitions 来计算的。
+
+### 消息重复消费案例
+consumer group offset有过期删除功能，比如每过一定时间（线上是3天）就失效掉过期的offsets。
+也就是说某个Consumer Group没有消费对应的topic下面的partition，那么这个group的offsets会被删除。
+这样就可以解决掉__consumer_offsets这个topic膨胀的问题。
+
+但是这个就引入了一个风险，如果某个topic的数据过期时间晚于对应的consumer group offset过期会出现什么情况呢？
+
+也就是说consumer group offset被删除了，但是对应的topic下partition数据并没有被删除。
+
+offset分了两个地方保存一个是刚才说的这个__consumer_offsets这个topic以及它对应的进程里面有一个内存快照（这个内存快照主要是访问加加速 在逻辑上和磁盘上的topic等价）是持久化的；
+另外一个是消费者的客户端sdk里面维持了当前消费到的位置，也就是客户端时用自己内存里面的offset去消费对应offset的数据的，也就是如果客户端进程不重启，它不会受这个失效影响。
+
+如果这个时候重启了会出现什么情况呢，即客户端本地内存里面没有这个offset，这个时候它就会去从__consumer_offsets去拿这个consumer group的offset，它就会发现拿到不到，这个时候什么行为呢？
+
+它会根据一个配置参数选择时从最新还是最老开始消费，这个参数默认时earliest也就是最早开始消费。这样子就可能导致可能出现重复消费。
+
+### Kafka 客户端的缓冲机制
+
+内存缓冲机制说白了，其实就是把多条消息组成一个Batch，一次网络请求就是一个Batch 或者多个 Batch。这样避免了一条消息一次网络请求，从而提升了吞吐量。
+
+当消息发送完成后，是否需要回收缓冲区？
+
+针对这个问题实现了一个非常优秀的机制，就是「缓冲池机制」。即每个 Batch 底层都对应一块内存空间，这个内存空间就是专门用来存放写进去的消息。
+
+当一个 Batch 数据被发送到了 kafka 服务端，这个 Batch 的内存空间不再使用了。此时这个 Batch 底层的内存空间先不交给 JVM 去垃圾回收，而是把这块内存空间给放入一个缓冲池里。
+
+一旦使用了这个缓冲池机制之后，就不涉及到频繁的大量内存的 GC 问题了。
+
+初始化分配固定的内存，即32MB。然后把 32MB 划分为 N 多个内存块，一个内存块默认是16KB，这样缓冲池里就会有很多的内存块。然后如果需要创建一个新的 Batch，就从缓冲池里取一个 16KB 的内存块就可以了。
+
+
+## 谈谈 kafka 的数据可靠性是怎么保证的?
+
+开始数据可靠性之前先看几个重要的概念：HW、LEO。
+
+HW：全称「Hign WaterMark」 ，即高水位，它标识了一个特定的消息偏移量 offset ，消费者只能拉取到这个水位 offset 之前的消息。
+LEO：全称「Log End Offset」，它标识当前日志文件中下一条待写入的消息的 offset，在 ISR 副本集合中的每个副本都会维护自身的LEO。
+
+
+HW 作用：
+
+1）用来标识分区下的哪些消息是可以被消费者消费的。
+2）协助 Kafka 完成副本数据同步。
+
+LEO 作用：
+
+1）如果 Follower 和 Leader 的 LEO 数据同步了, 那么 HW 就可以更新了。
+2）HW 之前的消息数据对消费者是可见的，属于 commited 状态,  HW 之后的消息数据对消费者是不可见的。
+
+HW 更新是需要一轮额外的拉取请求才能实现，Follower 副本要拉取 Leader 副本的数据，也就是说，Leader 副本 HW 更新和 Follower 副本 HW 更新在时间上是存在错配的。
+
+这种错配是很多“数据丢失”或“数据不一致”问题的根源。
+
+因此社区在 0.11 版本正式引入了 「Leader Epoch」 概念，来规避因 HW 更新错配导致的各种不一致问题。
+
+https://mp.weixin.qq.com/s?__biz=Mzg3MTcxMDgxNA==&mid=2247490489&idx=1&sn=17817f6d9837ad6a8823362d5ed38687&chksm=cefb3288f98cbb9edeb568e51127c25caa90da6dd064936560a851a9c9e5b865bb49ca04312d&scene=21#wechat_redirect
