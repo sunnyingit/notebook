@@ -57,11 +57,9 @@ Producer支持配置ACK,具体详情如下：
 
 当Ack=1或者Ack=-1的时候，有可能第一次发布给Leader Partition，Leader Partition收到数据但还没来得及ACK Producer就挂了，这样Producer会重新发送导致数据重复。
 
-配置重试时间 retry.backoff.ms
-
+配置重试时间:retry.backoff.ms
 该参数表示消息发送超时后两次重试之间的间隔时间，避免无效的频繁重试，默认值为100ms,  推荐设置为300ms。
 
-该参数表示消息发送超时后两次重试之间的间隔时间，避免无效的频繁重试，默认值为100ms,  推荐设置为300ms。
 
 为了解决这个问题，Broker 为 Producer 分配了一个ID，并通过每条消息的序列号进行去重，也就是说Producer发送数据时，会带上一个ID。
 broker收到这个ID后，会检测最近几条日志是否保存了该ID，如果有则不会重新保存，这样就保证了数据不会重复发布。
