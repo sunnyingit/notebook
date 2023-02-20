@@ -109,7 +109,7 @@ complete connection queue的大小设置在创建监听套接字的时候传递�
 通常认为backlog = complete connection queue + incomplete connection queue
 
 如果TCP连接队列溢出，有哪些指标可以看呢：
-、、、
+```
 [root@server ~]#  netstat -s | egrep "listen|LISTEN"
 667399 times the listen queue of a socket overflowed
 667399 SYNs to LISTEN sockets ignored
@@ -118,7 +118,7 @@ complete connection queue的大小设置在创建监听套接字的时候传递�
 // Send-Q: Send-Q 表示第三列的listen端口上的全连接队列最大为50
 Recv-Q Send-Q Local Address:Port  Peer Address:Port
 0        50               *:3306             *:*
-、、、
+```
 
 
 当客户端发送SYN时，如果这些队列是满的，那么服务器端会忽略该分节，也就是说，不发送RST，以期待客户端重新发送SYN （因为队列满状态是暂时的）

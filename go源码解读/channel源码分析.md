@@ -8,7 +8,7 @@ channel: 不要通过共享内存来通信，要通过通信来共享内存
 2. 先向 Channel 发送数据的 Goroutine 会得到先发送数据的权利；
 
 数据结构：
-、、、
+```
 type hchan struct {
 	qcount   uint
 	dataqsiz uint
@@ -23,7 +23,7 @@ type hchan struct {
 
 	lock mutex
 }
-、、、
+```
 
 1. qcount: Channel 中的元素个数；
 2. dataqsiz: Channel 中的循环队列的长度；
@@ -38,21 +38,21 @@ type hchan struct {
 
 ## 管道创建
 
-、、、
+```
 // 创建有缓存，类型为string的chan
 make(chan string, 100)
 
 // 创建无缓冲，类型为struct的chan, 省内存，尤其在事件通信的时候
 make(chan struct{})
-、、、
+```
 
 
 ## 发送数据
 
 发送格式如下：
-、、、
+```
 ch <- data
-、、、
+```
 
 1. 发送数据的逻辑执行之前会先为当前 Channel 加锁，防止多个线程并发修改数据。
 2. 如果channel为nil则直接阻塞协程。
@@ -70,12 +70,12 @@ ch <- data
 ## 接收数据
 
 從channel中接受数据方式有两种：
-、、、
+```
 
 i <- ch
 
 i, ok <- ch
-、、、
+```
 
 
 1. 从一个空 Channel接收数据时会直接调用 runtime.gopark 让出处理器的使用权，协程阻塞并抛出异常.
@@ -92,13 +92,13 @@ i, ok <- ch
 
 ## 关闭管道
 
-、、、
+```
 close(ch)
-、、、
+```
 
 当 Channel 是一个【空指针】或者【已经被关闭】时，Go 语言运行时都会直接崩溃并抛出异常：
 
-、、、
+```
 func closechan(c *hchan) {
 	if c == nil {
 		panic(plainError("close of nil channel"))
@@ -110,12 +110,12 @@ func closechan(c *hchan) {
 		panic(plainError("close of closed channel"))
 	}
 }
-、、、
+```
 
 如何判断一个 channel 是否已经被关闭？我们可以在读取的时候使用多重返回值的方式：
 
-、、、
+```
 x, ok := <-ch
-、、、
+```
 
 这个用法与 map 中的按键获取 value 的过程比较类似，只需要看第二个 bool 返回值即可，如果返回值是 false 则表示 ch 已经被关闭。

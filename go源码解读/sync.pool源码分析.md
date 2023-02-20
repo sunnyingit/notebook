@@ -13,9 +13,7 @@ sync.pool 源码分析
 sync.pool的使用及其简单，只提供两个方法:
 1. get: 从pool中获取一个对象
 2. put: 把对象放回pool中
-
-、、、
-
+```
 var metricPool = &sync.Pool{
     New: func() interface{} {
         return &Metric{
@@ -36,7 +34,7 @@ func PutBackToMetricPool(m *Metric) {
     reSetMetric(m)
     metricPool.Put(m)
 }
-、、、
+```
 
 
 这样设计后，所有需要初始化Metric地方都使用GetFromMetricPool方法，Metric对象生命周期结束后使用PutBackToMetricPool放到pool中。
@@ -51,7 +49,7 @@ sync.pool 还需要注意的点:
 
 ## 源码分析
 
-、、、
+```
 type Pool struct {
     // 禁止copy该实例
     noCopy noCopy
@@ -130,7 +128,7 @@ func (p *Pool) Put(x interface{}) {
         race.Enable()
     }
 }
-、、、
+```
 
 ## 内存对象清除
 每个被使用的 sync.Pool，都会在初始化阶段被添加到全局变量 allPools []*Pool 对象中。Golang 的 runtime 将会在 每轮 GC 前，触发调用 poolCleanup 函数，清理 allPools，调用PoolClenup时候，会Stop The World。
@@ -141,7 +139,7 @@ func (p *Pool) Put(x interface{}) {
 
 代码逻辑如下：
 
-、、、
+```
 func poolCleanup() {
     // This function is called with the world stopped, at the beginning of a garbage collection.
     // It must not allocate and probably should not call any runtime functions.
@@ -163,7 +161,7 @@ func poolCleanup() {
 	}
 
 	oldPools, allPools = allPools, nil
-、、、
+```
 
 在每轮 sync.Pool 的清理中，暂时不会完全清理对象池，而是将其放在 victim 中。等到下一轮清理，才完全清理掉 victim。也就是说，每轮 GC 后 sync.Pool 的对象池都会转移到 victim 中，同时将上一轮的 victim 清空掉。
 

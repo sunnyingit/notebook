@@ -13,7 +13,7 @@ RWMutex 读写锁的实现
 > 这种【读写分离】的思想，在数据库设计方面也经常被应用到。设计主从数据库，主数据库用来写数据，从数据库用来读。读写数据库的锁级别可以设置不一样。x
 
 ## 使用案例
-、、、
+```
 type Stat struct {
     // 模拟资源，go的map类型是不允许并发读写的
 	counters map[string]int64
@@ -43,7 +43,7 @@ func (s *Stat) GetCounter(name string) int64 {
 
 	return s.counters[name]
 }
-、、、
+```
 
 ## 实现构想
 
@@ -74,7 +74,7 @@ func (s *Stat) GetCounter(name string) int64 {
 
 ## 读锁源码
 
-、、、
+```
 type RWMutex struct {
     // w是一把互斥锁，用于控制【写写】操作之间的并发
 	w  Mutex
@@ -135,10 +135,10 @@ func (rw *RWMutex) rUnlockSlow(r int32) {
 	}
 }
 
-、、、
+```
 
 ## 写锁源码
-、、、
+```
 func (rw *RWMutex) Lock() {
     // 先加互斥锁，保证同时只能有一个协程加【写锁】成功。
 	rw.w.Lock()
@@ -172,12 +172,12 @@ func (rw *RWMutex) Unlock() {
 	// 唤醒其他加【读锁】而阻塞的协程
 	rw.w.Unlock()
 }
-、、、
+```
 
 ## 思考
 
 请看下面代码
-、、、
+```
 func (s *Stat) GetCounter(name string) int64 {
 	// 读锁
 	s.mutex.RLock()
@@ -185,7 +185,7 @@ func (s *Stat) GetCounter(name string) int64 {
 
 	return s.counters[name]
 }
-、、、
+```
 试想，有没有一种情况，协程A，协程B同时加读锁，因为`AddInt32`的原子性保证，只会有一个协程执行成功。假如协程A加读锁成功后，还没有来得及执行`s.counters[name]`， 协程A所在的线程因为时间片到期被剥夺了CPU执行权，之后协程B在也加读锁成功，如果协程A被唤醒，那有没有可能协程A和协程B同时访问s.counters呢？
 
 答案是不会，协程A会在线程交出CPU控制权前会把该协程移动到其他线程上。

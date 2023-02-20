@@ -2,7 +2,7 @@
 
 `Once` 保证函数只会执行一次, Demo:
 
-、、、
+```
 package main
 
 import (
@@ -30,13 +30,13 @@ func main() {
 }
 
 // 输出一次Only once
-、、、
+```
 
 ## 使用案例
 
 1. 用于只输出一次错误日志
 
-、、、
+```
 	for i := 0; i < n; i++ {
 		go func() {
 			if err := repo.Set(configs); err != nil {
@@ -48,11 +48,11 @@ func main() {
 			wg.Done()
 		}()
 	}
-、、、
+```
 
 2. 用于close channel, channel只能被close一次
 
-、、、
+```
 	inboundEmpty := make(chan struct{})
 	var onUpdateOnce sync.Once
 	onUpdate := func(p *Peer) {
@@ -63,11 +63,11 @@ func main() {
 			})
 		}
 	}
-、、、
+```
 
 ## 源码分析
 
-、、、
+```
 type Once struct {
 	// done等于1表示f函数已经执行完成
 	done uint32
@@ -110,7 +110,7 @@ func (o *Once) doSlow(f func()) {
 	}
 }
 
-、、、
+```
 
 ## 总结
 1. 通过`Done`的两次检查实现Do方法，我们可以`double-check`思想

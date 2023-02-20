@@ -26,14 +26,14 @@ Redis 使用对象来表示数据库中的键和值， 每次当我们在 Redis 
 
 举个例子， 以下 SET 命令在数据库中创建了一个新的键值对， 其中键值对的键是一个包含了字符串值 "msg" 的对象， 而键值对的值则是一个包含了字符串值 "hello world" 的对象：
 
-、、、
+```
 redis> SET msg "hello world"
 OK
-、、、
+```
 
 Redis 中的每个对象都由一个 redisObject 结构表示， 该结构中和保存数据有关的三个属性分别是 type 属性、 encoding 属性和 ptr 属性：
 
-、、、
+```
 typedef struct redisObject {
     // 类型
     unsigned type:4;
@@ -47,7 +47,7 @@ typedef struct redisObject {
     // 引用计数
     int refcount;
 }
-、、、
+```
 
 
 其中类型包括：
@@ -57,14 +57,14 @@ typedef struct redisObject {
 4. REDIS_SET	集合对象
 5. REDIS_ZSET	有序集合对象
 
-、、、
+```
 # 键为字符串对象，值为列表对象
 redis> RPUSH numbers 1 3 5
 (integer) 6
 
 redis> TYPE numbers
 list
-、、、
+```
 
 对象的 ptr 指针指向对象的底层实现数据结构， 而这些数据结构由对象的 encoding 属性决定。
 encoding 属性记录了对象所使用的编码， 也即是说这个对象使用了什么数据结构作为对象的底层实现， 这个属性的值可以是表 8-3 列出的常量的其中一个
@@ -85,13 +85,13 @@ encoding 属性记录了对象所使用的编码， 也即是说这个对象使�
 |REDIS_ZSET	|REDIS_ENCODING_SKIPLIST |使用跳跃表和字典实现的有序集合对象 |
 
 查看对象编码：
-、、、
+```
 redis> SET msg "hello wrold"
 OK
 
 redis> OBJECT ENCODING msg
 "embstr"
-、、、
+```
 
 ### 引用计数
 对象的引用计数信息会随着对象的使用状态而不断变化：
@@ -129,7 +129,7 @@ redis> OBJECT ENCODING msg
 
 ### 字符串SDS的定义
 
-、、、
+```
 type sdsdr {
     # 记录了buf中已经使用的字节数量
     int len
@@ -140,14 +140,14 @@ type sdsdr {
     # 字节数组
     char buff[];
 }
-、、、
+```
 
 通过记录字符串长度len，可以快速读取字符串长度，通过free和buff的使用，尽可能的避免字符串修改时候内存的重新分配。
 
 
 ### 列表的定义
 列表键的底层实现之一就是链表： 当一个列表键包含了数量比较多的元素， 又或者列表中包含的元素都是比较长的字符串时， Redis 就会使用链表作为列表键的底层实现。
-、、、
+```
 struct listNode {
     struct ListNode *prev;
     struct ListNode *next
@@ -155,11 +155,11 @@ struct listNode {
     # 节点的值
     void *value
 } ListNode
-、、、
+```
 
 多个 listNode 可以通过 prev 和 next 指针组成双端链表。
 
-、、、
+```
 struct list {
      // 表头节点
     listNode *head;
@@ -179,7 +179,7 @@ struct list {
     // 节点值对比函数
     int (*match)(void *ptr, void *key);
 } list
-、、、
+```
 
 list 结构为链表提供了表头指针 head 、表尾指针 tail ， 以及链表长度计数器 len ， 而 dup 、 free 和 match 成员则是用于实现多态链表所需的类型特定函数：
 1. dup 函数用于复制链表节点所保存的值；
@@ -189,7 +189,7 @@ list 结构为链表提供了表头指针 head 、表尾指针 tail ， 以及�
 
 ### 字典
 字典是通过hash表的方式实现
-、、、
+```
 struct dictht {
     // 哈希表数组
     dictEntry **table;
@@ -204,7 +204,7 @@ struct dictht {
     // 该哈希表已有节点的数量
     unsigned long used;
 } dictht
-、、、
+```
 
 table 属性是一个数组， 数组中的每个元素都是一个指向 dict.h/dictEntry 结构的指针， 每个 dictEntry 结构保存着一个键值对。
 
@@ -213,7 +213,7 @@ size 属性记录了哈希表的大小， 也即是 table 数组的大小， 而
 sizemask 属性的值总是等于 size - 1 ， 这个属性和哈希值一起决定一个键应该被放到 table 数组的哪个索引上面。
 
 dictEntry的结构如下：
-、、、
+```
 typedef struct dictEntry {
 
     // 键
@@ -230,16 +230,16 @@ typedef struct dictEntry {
     struct dictEntry *next;
 
 } dictEntry;
-、、、
+```
 
 
 当有两个或以上数量的键被分配到了哈希表数组的同一个索引上面时， 我们称这些键发生了冲突（collision）。
 
 Redis 的哈希表使用链地址法（separate chaining）来解决键冲突： 每个哈希表节点都有一个 next 指针， 多个哈希表节点可以用 next 指针构成一个单向链表， 被分配到同一个索引上的多个节点可以用这个单向链表连接起来， 这就解决了键冲突的问题。
 
-、、、
+```
 dictEntry1 -> dictEntry2 -> dictEntry3
-、、、
+```
 
 通过key查找的时候，首先通过hash(key)找到对应的entry, 然后遍历entry列表，通过比对dictEntry的key就可以找到对应的value.
 
@@ -249,7 +249,7 @@ dictEntry1 -> dictEntry2 -> dictEntry3
 整数集合（intset）是 Redis 用于保存整数值的集合抽象数据结构， 它可以保存类型为 int16_t 、 int32_t 或者 int64_t 的整数值， 并且保证集合中不会出现重复元素。
 
 
-、、、
+```
 typedef struct intset {
 
     // 编码方式
@@ -262,7 +262,7 @@ typedef struct intset {
     int8_t contents[];
 
 } intset;
-、、、
+```
 
 ### 跳跃表
 
@@ -271,12 +271,12 @@ Redis 使用跳跃表作为有序集合键的底层实现之一： 如果一个�
 跳跃表就是在双向列表的基础上增加多级指针，分别指向多个后续的节点，这样遍历的时候就不需要一一遍历，从而实现了跳越遍历。
 
 例如，node1节点指向了node2,node3和node4， 如果查找node4只需要遍历一次就行。
-、、、
+```
 
 node1 -> node2 -> node3 -> node4
     ------------>
     ---------------------->
-、、、
+```
 
 
 为什么使用跳跃表

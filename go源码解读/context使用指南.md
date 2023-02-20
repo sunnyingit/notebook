@@ -9,7 +9,7 @@ Context可以在Gourtines之间用来设置截止日期、同步信号，传递�
 
 比如一个网络请求Request，每个Request都需要开启一个goroutine做一些事情，这些goroutine又可能会开启其他的goroutine。当请求超时时，需要关闭所有的goroutines：
 
-、、、
+```
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	go watch(ctx,"【监控1】")
@@ -39,7 +39,7 @@ func watch(ctx context.Context, name string) {
 		}
 	}
 }
-、、、
+```
 
 Context本身可以构建出一个树， 当父节点cancel时，其所有的子节点都被会cancel。
 
@@ -50,7 +50,7 @@ Context本身可以构建出一个树， 当父节点cancel时，其所有的子
 
 ## WithTimeout的使用
 我们创建了一个过期时间为 1s 的上下文，并向上下文传入 handle 函数，该方法会使用 500ms 的时间处理传入的请求：
-、、、
+```
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -70,7 +70,7 @@ func handle(ctx context.Context, duration time.Duration) {
 		fmt.Println("process request with", duration)
 	}
 }
-、、、
+```
 
 
 ## Deadline Context
@@ -84,7 +84,7 @@ func handle(ctx context.Context, duration time.Duration) {
 2. 适当调整整个请求的超时时间
 
 DeadLine Context使用：
-、、、
+```
 package main
 
 import (
@@ -120,4 +120,4 @@ func RpcClient(ctx context.Context) {
         }
     }
 }
-、、、
+```

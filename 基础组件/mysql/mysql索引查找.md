@@ -7,7 +7,7 @@ mysql 索引详解
 磁盘上的每个磁道被等分为若干个弧段，这些弧段称之为扇区。
 
 硬盘的物理读写以扇区为基本单位。通常情况下每个扇区的大小是 512 字节。linux 下可以使用 fdisk -l 了解扇区大小：
-、、、
+```
 $ sudo /sbin/fdisk -l
 Disk /dev/sda: 20 GiB, 21474836480 bytes, 41943040 sectors
 Units: sectors of 1 * 512 = 512 bytes
@@ -15,7 +15,7 @@ Sector size (logical/physical): 512 bytes / 512 bytes
 I/O size (minimum/optimal): 512 bytes / 512 bytes
 Disklabel type: dos
 Disk identifier: 0x7d9f5643
-、、、
+```
 
 
 磁盘块是文件系统读写数据的最小单位，也叫磁盘簇。
@@ -23,7 +23,7 @@ Disk identifier: 0x7d9f5643
 扇区是磁盘最小的物理存储单元，操作系统将相邻的扇区组合在一起，形成一个块，对块进行管理。每个磁盘块可以包括 2、4、8、16、32 或 64 个扇区。磁盘块是操作系统所使用的逻辑概念，而非磁盘的物理概念。
 
 磁盘块的大小可以通过命令 stat /boot 来查看：
-、、、
+```
 sudo stat /boot
   File: /boot
   Size: 4096        Blocks: 8          IO Block: 4096   directory
@@ -33,7 +33,7 @@ Access: 2019-07-06 20:19:45.487160301 +0800
 Modify: 2019-07-06 20:19:44.835160301 +0800
 Change: 2019-07-06 20:19:44.835160301 +0800
  Birth: -
-、、、
+```
 
 其中 IO Block 就是磁盘块大小，本例中是 4096 Bytes，一般也是 4K。
 

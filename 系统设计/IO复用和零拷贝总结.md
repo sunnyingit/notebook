@@ -60,9 +60,9 @@ IO复用： 所谓IO复用是一种能力，应用程序首先告知内核需要
 
 select而言：
 
-、、、
+```
 select(int maxfdp1,*readset,*writeset,*exceptset, timeout)
-、、、
+```
 1. 可以注册可读，可写，异常的相关套接字
 2. timeout取值: None: 一直阻塞知道数据准备好，0: 不阻塞，立即返回，相当于轮询； >0: 阻塞的时间，当超过阻塞的时间还没有数据准备好则返回为空的集合
 3. maxfdp1 = sockfd + 1 select在内核中是轮询的，内核遍历所有注册的fd，查看是否有准备好的fd， 套接字是从0开始的，所以maxfd = max(socket) + 1，这也是select的限制(轮询和描述符数量限制)
@@ -126,10 +126,10 @@ ET模式也就是边缘触发模式，如果我们将socket添加到epoll_event�
 
 ### mmap + write
 一种零拷贝方式是使用 mmap + write 代替原来的 read + write 方式，减少了 1 次 CPU 拷贝操作。mmap 是 Linux 提供的一种内存映射文件方法，即将一个进程的地址空间中的一段虚拟地址映射到磁盘文件地址，mmap + write 的伪代码如下：
-、、、
+```
 tmp_buf = mmap(file_fd, len);
 write(socket_fd, tmp_buf, len);
-、、、
+```
 
 使用 mmap 的目的是将内核中读缓冲区（read buffer）的地址与用户空间的缓冲区（user buffer）进行映射，从而实现内核缓冲区与应用程序内存的共享，省去了将数据从内核读缓冲区（read buffer）拷贝到用户缓冲区（user buffer）的过程，然而内核读缓冲区（read buffer）仍需将数据到内核写缓冲区（socket buffer）。
 
@@ -137,9 +137,9 @@ write(socket_fd, tmp_buf, len);
 ### sendfile
 
 sendfile 系统调用在 Linux 内核版本 2.1 中被引入，目的是简化通过网络在两个通道之间进行的数据传输过程。sendfile 系统调用的引入，不仅减少了 CPU 拷贝的次数，还减少了上下文切换的次数，它的伪代码如下：
-、、、
+```
 sendfile(socket_fd, file_fd, len);
-、、、
+```
 
 
 通过 sendfile 系统调用，数据可以直接在内核空间内部进行 I/O 传输，从而省去了数据在用户空间和内核空间之间的来回拷贝。与 mmap 内存映射方式不同的是， sendfile 调用中 I/O 数据对用户空间是完全不可见的。也就是说，这是一次完全意义上的数据传输过程。

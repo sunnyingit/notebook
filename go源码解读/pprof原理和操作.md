@@ -20,19 +20,19 @@
 go程序开启cpu性能分析后，go程序每10ms停止1次，然后记录当前正在执行的协程堆栈信息，通过堆栈信息，记录每个函数占用cpu次数，这个过程叫做采样。采样结束后，如果函数被采到的次数最多，说明这个函数累计占用cpu的时间越多，也就是需要优化的对象。
 
 我们知道函数，函数可能调用子函数，例如：
-、、、
+```
 a() {
     // do some code
     b()
     c()
     d()
 }
-、、、
+```
 
 函数`a`执行包括【本身代码执行】和【调用子函数】，执行本身代码的时被采样时间记为`flat`，函数`a`执行包括调用子函数时，被采样的时间记为`cum`(cumulative):
 
 下面一份真实的性能分析结果:
-、、、
+```
 Type: cpu  // 采用类型是cpu
 Time: Jan 25, 2021 at 5:00pm (CST)
 Duration: 2mins, Total samples = 2.36mins (118.00%) // 程序运行时间是2mins, 采样耗时2.36mins
@@ -47,7 +47,7 @@ Duration: 2mins, Total samples = 2.36mins (118.00%) // 程序运行时间是2min
      3.10s  2.19% 32.48%      3.13s  2.21%  runtime.pageIndexOf (inline)
      2.77s  1.95% 34.43%      3.23s  2.28%  runtime.runqgrab
      2.48s  1.75% 36.18%      2.49s  1.76%  runtime.(*lfstack).pop
-、、、
+```
 每一行代表一个函数的统计结果，拿`scanobject`函数举例，从数据里面可以看到`scanobject`函数执行了13.62s，占用了百分百`9.61% = 13.62s/(2.36*60)`，这个函数还调用了子函数，最终这个函数占用cpu的时间为`26.73s`，占用比例`18.86%`。
 
 我们通过查看`flat`和`cum`这两个指标就可以找到最耗cpu的相关函数。
@@ -63,7 +63,7 @@ Duration: 2mins, Total samples = 2.36mins (118.00%) // 程序运行时间是2min
 和cpu性能结果类似，函数在执行过程中可能分配内存，其调用的子函数也可能分配内存，函数本身分配的内存记为`flat`, 函数执行完成后，分配的总内存记为`cum`:
 
 下面是一份真实的性能分析结果:
-、、、
+```
 File: ae-app-300
 Type: inuse_space // 采样类型是正在使用的内存
 Time: Jan 25, 2021 at 5:06pm (CST)
@@ -83,7 +83,7 @@ Showing top 10 nodes out of 54
   512.02kB  8.27%   100%   512.02kB  8.27%  internal/profile.glob..func19
          0     0%   100%   518.65kB  8.38%  bytes.(*Buffer).Write
          0     0%   100%   518.65kB  8.38%  bytes.(*Buffer).grow
-、、、
+```
 
 这份报告是统计使用的内存大小`inuse_space`，每一行代表一个函数的分配结果，本次性能分析一共分配内存`6191.91kB`, `postDecode`分配`1536.52kB`, 占用24.81%。
 
@@ -97,10 +97,10 @@ Showing top 10 nodes out of 54
 2. 常驻程序，如web服务。
 
 针对非常驻程序，需要在程序代码中添加采样代码：
-、、、
+```
 // 获取cpu采样数据
 defer profile.Start(profile.CPUProfile, profile.ProfilePath(".")).Stop()
-、、、
+```
 其中，`profile.CPUProfile` 表示做cpu采样，`profile.ProfilePath(".")` 表示采样结果保存在当前目录。
 
 当程序运行结束后，在当前目录会生成`cpu.pprof`文件。
@@ -110,13 +110,13 @@ defer profile.Start(profile.CPUProfile, profile.ProfilePath(".")).Stop()
 这种进程类型，只需要在项目中导入`import _ "net/http/pprof"`, 其他的什么都不需要做。
 
 导入`"net/http/pprof"`包之后，`pprof`包会自动注册如下路由：
-、、、
+```
 	http.HandleFunc("/debug/pprof/", Index)
 	http.HandleFunc("/debug/pprof/cmdline", Cmdline)
 	http.HandleFunc("/debug/pprof/profile", Profile)
 	http.HandleFunc("/debug/pprof/symbol", Symbol)
 	http.HandleFunc("/debug/pprof/trace", Trace)
-、、、
+```
 通过访问`http://your_server_host:port/debug/pprof/profile?seconds=30` 就可以看到profile结果。
 
 注意：构建的请求需要尽量覆盖已有的业务逻辑，这样采样的样本才会更接近用户的真实请求。
@@ -124,7 +124,7 @@ defer profile.Start(profile.CPUProfile, profile.ProfilePath(".")).Stop()
 > seconds参数表示性能分析进行多长时间，默认是30s，web服务是常驻型服务，所以我们可以指定任意时间来进行性能分析，推荐不超过2min
 
 除了获取cpu采样数据以外，还可以:
-、、、
+```
 # 堆内存分配采样，可以用来分析内存分配
 go tool pprof "http://your_server_host:port/debug/pprof/heap?seconds=30"
 
@@ -136,7 +136,7 @@ go tool pprof "http://your_server_host:port/debug/pprof/block?seconds=30"
 
 # 锁采样，用来分析死锁
 go tool pprof "http://your_server_host:port/debug/pprof/mutex?seconds=30"
-、、、
+```
 
 拿到采样数据后，我们下一步需要做的事情，就是解读采样数据
 
@@ -146,7 +146,7 @@ go tool pprof "http://your_server_host:port/debug/pprof/mutex?seconds=30"
 `go tool pprof`有2种方式分析采样数据。
 
 第一种是命令行式，直接使用`go tool pprof path_to_profiling_file`。
-、、、
+```
 ➜  ~ go tool pprof /Users/work/pprof/pprof.ae-app-300.samples.cpu.003.pb.gz
 File: ae-app-300
 Type: cpu
@@ -154,12 +154,12 @@ Time: Jan 25, 2021 at 5:00pm (CST)
 Duration: 2mins, Total samples = 2.36mins (118.00%)
 Entering interactive mode (type "help" for commands, "o" for options)
 (pprof)
-、、、
+```
 
 执行此命令后，显示采样类型为`cpu`, 采样时间持续`2min`, 采样过程花费了`2.36min`, 因为程序会暂停，所以采样过程花费时间大于采样时间。
 
 我们可以通过`topN`命令查看最耗时的函数，例如:
-、、、
+```
 File: ae-app-300
 Type: cpu
 Time: Jan 25, 2021 at 5:00pm (CST)
@@ -182,10 +182,10 @@ Showing top 10 nodes out of 302
      2.77s  1.95% 34.43%      3.23s  2.28%  runtime.runqgrab
      2.48s  1.75% 36.18%      2.49s  1.76%  runtime.(*lfstack).pop
 (pprof)
-、、、
+```
 
 函数默认以`flat`排序， 如果想以`cum排序`，可执行`top -cum`：
-、、、
+```
 (pprof) top -cum
 Showing nodes accounting for 24.80s, 17.50% of 141.75s total
 Dropped 1331 nodes (cum <= 0.71s)
@@ -202,10 +202,10 @@ Showing top 10 nodes out of 302
      0.31s  0.22% 17.47%     18.76s 13.23%  runtime.schedule
      0.03s 0.021% 17.50%     18.62s 13.14%  runtime.mcall
 (pprof)
-、、、
+```
 
 如果不想显示任何`runtime`相关的函数，可执行`top -runtime*`
-、、、
+```
 (pprof) top -runtime*
 Active filters:
    ignore=runtime*  // 过滤了runtime*的函数
@@ -223,7 +223,7 @@ Showing top 10 nodes out of 262
      0.35s  0.25%  4.23%      0.48s  0.34%  golang.org/x/text/encoding/simplifiedchinese.gbkDecoder.Transform
      0.33s  0.23%  4.47%      0.33s  0.23%  reflect.(*rtype).Kind (partial-inline)
      0.33s  0.23%  4.70%      0.34s  0.24%  sync.(*poolChain).popTail
-、、、
+```
 
 如果想看所有函数的调用栈信息，执行`web`命令，会生成一个svg格式的文件，在浏览器中展示。
 > 如果svg不能正常显示，则需要安装graphviz，在mac上执行 brew install graphviz 即可

@@ -24,25 +24,25 @@ HTTP协议规定了请求报文和响应的格式。
 
 请求报文格式如下：
 
-、、、
+```
 request_method uri http_version     # 请求方法 资源地址 http版本
 request_headers                     # 请求头部信息
 空行(CR+LF)                         # 空行 (解析请求数据流时读取到空行说明请求头部解析完成)
 request_body                        # 请求参数
-、、、
+```
 
 响应报文格式如下：
 
-、、、
+```
 status_code http_version message    # 响应状态 http版本 响应消息
 response_headers                    # 响应头部信息
 空行(CR+LF)                         # 空行解析响应数据流时读取到空行说明响应头部解析完成
 response_body                       # 响应数据
-、、、
+```
 
 一个完整请求和响应的实例如下：
 
-、、、
+```
 // 请求
 GET /chat HTTP/1.0
 User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5)
@@ -60,7 +60,7 @@ Content-Length: 137582
 <html>
   <body>Hello World</body>
 </html>
-、、、
+```
 
 ## 请求行和响应行
 HTTP支持的请求方法有：GET，POST，DELETE，HEAD，OPTIONS，PUT，HEAD，在RestFull Api设计中，常使用到GET，POST，DELETE，PUT。
@@ -94,12 +94,12 @@ HTTP目前主流版本有：HTTP/1.0，HTTP/1.1， 目前默认http版本是HTTP
 ### application/x-www-form-urlencoded
 
 这应该是最常见的 POST 提交数据的方式，表单如果不设置 enctype 属性，就会以 application/x-www-from-urlencoded 方式提交数据url
-、、、
+```
 POST http://www.example.com HTTP/1.1
 Content-Type: application/x-www-form-urlencoded;charset=utf-8
 
 title=test&sub%5B%5D=1&sub%5B%5D=2&sub%5B%5D=3
-、、、
+```
 
 首先，Content-Type 被指定为application/x-www-form-urlencoded，其次，提交的数据按照 key1=val1&key2=val2 的方式进行编码，key 和 val 都进行url转码
 
@@ -110,7 +110,7 @@ title=test&sub%5B%5D=1&sub%5B%5D=2&sub%5B%5D=3
 ### application/json
 
 现在越来越多的人把它作为请求头，用来告诉服务端消息主体是序列化后的 JSON 字符串：
-、、、
+```
 
 POST http://www.example.com HTTP/1.1
 Content-Type: application/json;charset=utf-8
@@ -118,17 +118,17 @@ Content-Type: application/json;charset=utf-8
 {"title":"test","sub":[1,2,3]}
 php 无法通过 $_POST 对象从上面的请求中获得内容，需要从php原始字节流获取数据，服务器端接受到的其实是字符串
 
-、、、
+```
 
 php判断是否为json请求：
 
-、、、
+```
 
 public function isJson()
 {
     return str_contains($_SERVER['CONTENT_TYPE'], '/json');
 }
-、、、
+```
 
 ### text/xml
 它是一种使用 HTTP 作为传输协议，XML 作为编码方式的远程调用规范，目前用的不多。

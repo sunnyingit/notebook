@@ -3,7 +3,7 @@ Select源码分析
 Go 语言中的 select 也能够让 Goroutine 同时等待多个 Channel 可读或者可写，在多个文件或者 Channel状态改变之前，select 会一直阻塞当前线程或者 Goroutine。
 
 常见用法：
-、、、
+```
 
 select {
     // 监听ch channel
@@ -16,7 +16,7 @@ select {
         return ret, msg
     }
 }
-、、、
+```
 
 elect 控制结构时，会遇到两个有趣的现象：
 1. select 能在 Channel 上进行非阻塞的收发操作。
@@ -26,7 +26,7 @@ elect 控制结构时，会遇到两个有趣的现象：
 ## 非阻塞的收发
 
 当我们运行下面的代码时就不会阻塞当前的 Goroutine，它会直接执行 default 中的代码：
-、、、
+```
 func main() {
 	ch := make(chan int)
 	select {
@@ -37,13 +37,13 @@ func main() {
 		println("default")
 	}
 }
-、、、
+```
 
 常见案例：
 
 判断tasks在执行的过程中是否出错，没有出错则直接返回nil:
 
-、、、
+```
 errCh := make(chan error, len(tasks))
 wg := sync.WaitGroup{}
 wg.Add(len(tasks))
@@ -64,7 +64,7 @@ case err := <-errCh:
 default:
     return nil
 }
-、、、
+```
 
 ## 总结
 1. 空的 select 语句会被转换成调用 runtime.block 直接挂起当前 Goroutine；

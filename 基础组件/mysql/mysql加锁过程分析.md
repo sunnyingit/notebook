@@ -81,16 +81,16 @@ id是主键，Read Committed隔离级别，给定SQL：select快照读不加锁�
 ## 死锁原理与分析
 
 Transation1:
-、、、
+```
 SQL1：select * from t1 where id=1 for update;
 SQL2：delete from t1 where id=5;
-、、、
+```
 
 Transation2:
-、、、
+```
 SQL1：delete from t1 where id=5;
 SQL2：select * from t1 where id=1 for update;
-、、、
+```
 
 mysql进行加锁是需要满足2PL的，在事务中先对于满足的记录进行加锁，事务完成后再进行解锁；
 

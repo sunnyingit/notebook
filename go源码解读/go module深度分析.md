@@ -8,15 +8,15 @@ go.mod文件必须放到项目根目录下(不可放到\$GOPATH/src目录)，下
 ## Go Module使用
 
 在根目录中执行`go mod init {module-path}`命令，例如执行`go mod init icode.company.com/company/hello`就可以在当前目录创建go.mod文件。
-、、、
+```
 cat go.mod
 module icode.company.com/company/hello
-、、、
+```
 
 一般来讲，`module-path`的格式没有特别要求，好的`module-path`命名应该描述了module的作用以及去哪里下载它，比如`github.com/docker/compose`。
 
 此时go.mod文件中并没有依赖module，如果在package中import了其他module，例如：
-、、、
+```
 package hello
 
 import "rsc.io/quote"
@@ -24,15 +24,15 @@ import "rsc.io/quote"
 func Hello() string {
     return quote.Hello()
 }
-、、、
+```
 在根目录执行`go build`命令，此时Go会自动下载依赖的Module，并写入到go.mod文件中
-、、、
+```
 module icode.company.com/company/hello
 
 go 1.12
 
 require rsc.io/quote v1.5.2 // require定义了依赖的module，并指定了版本
-、、、
+```
 其他操作包括更新依赖的module并删除无须再依赖的module时，执行`go mod tidy`，查看当前module依赖的所有module，执行`go list -m all`，查看module依赖关系可使用`go mod graph | grep {module-path}`，当分析为什么需要这个module时特别有用。
 
 
@@ -87,16 +87,16 @@ Go选择版本时，遵守了最小版本选择原则，针对以上例子，如
 当出现这个问题时，我们可以使用`replace`指令来实现通过依赖Module-C1和Module-C2。
 
 比如下面例子同时依赖`v0.8.1`和`v0.9.1`，使用如下：
-、、、
+```
 module multiversion
 
 go 1.13
 
 replace github.com/pkg/errors/081 => github.com/pkg/errors v0.8.1
 replace github.com/pkg/errors/091 => github.com/pkg/errors v0.9.1
-、、、
+```
 使用replace过的module-path：
-、、、
+```
 package main
 
 import (
@@ -121,14 +121,14 @@ func main() {
     fmt.Println(err)
 
 }
-、、、
+```
 
 再次总结一下，当依赖多个不同的Module版本时，Go会优先选择高版本。
 
 `replace`指令除了用于处理多版本后，还有一个更实用的场景，例如在代码开发阶段，我们需要测试本地的代码，我们可以使用`replace`指令将编译的module指定为本地代码，例如：
-、、、
+```
 replace icode.com/compose/seda => /work/vsgo-179/seda
-、、、
+```
 这样在编译`icode.com/compose/seda` Module时，会使用本地代码`/work/vsgo-179/seda`。
 
 ## 其他操作

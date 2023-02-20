@@ -9,14 +9,14 @@ Redis 使用说明
 redis-server采用异步非阻塞模式，因为是单线程的，所以只会有一个命令被执行，所以大部分的处理都是原子性的。
 因为redis命令是原子性，可以用来做并发控制(多个客户端同时执行decr),每次只会有一个客户端成功。
 
-、、、
+```
 # 原子操作, 可以用来做并发控制
 redis.decr(1)
 
 # 如果是两个命令的话，是不能保证原子操作的
 v = redis.get(k)
 redis.set(v-1)
-、、、
+```
 
 因为redis是单线程的，所以如果某个命令被阻塞，则redis整个服务都会被阻塞
 
@@ -35,13 +35,13 @@ redis.set(v-1)
 
 hash_key不能配置，必须不同的实例hask_key不一样，所以正好可以获取redis client所在的机器ip。
 如果这个机器被摘，那么对于的key都无法再被访问，所以最好加入超时时间。
-、、、
+```
 # 根据本机的ip取模，这样请求到本机的key都会散列某台服务器上
 # 在分布式环境中，web机器有很多，所有key会被散列到不同的redis机器上
 ip_address = socket.gethostbyname(socket.gethostname())
 hash_key = ip2long(ip_address) % 16
 cache_key = 'key:{}:{}'.format(hash_key, key)
-、、、
+```
 
 雪崩： redis的key在统一时间失效，如果在一次请求中，需要访问三个key，但是这三个key的缓存失效时间都一样，导致所有的请求都打到数据库
 解决： 设置在key的缓存时间加一个随机数，避免所有的key都在同一时间失效
@@ -172,13 +172,13 @@ AOF重写的操作是有子进程执行的，子进程在进行 AOF 重写期间
 ## Pipeline
 可以将多次IO往返的时间缩减为一次，注意 pipeline并不能保证原子性
 
-、、、
+```
 with client.pipeline(transaction=False) as pipe:
     for meta in metas:
         key = self.format_key(meta.id)
         pipe.set(key, meta.integer, ex=int(meta.ttl))
     pipe.execute()
-、、、
+```
 
 
 ## Redis和分布式锁
@@ -197,9 +197,9 @@ with client.pipeline(transaction=False) as pipe:
 
 redis怎么保证这三个特性：
 
-、、、
+```
 SET resource_name random_value NX PX 30000
-、、、
+```
 
 1. random_value必须是随机的，这个随机数可以保证锁的安全性
 2. NX：表示只能当resource_name不存在的情况下才能设置成功

@@ -12,7 +12,7 @@ Golang的map在使用中需要注意：
 
 ## 数据结构
 
-、、、
+```
 type hmap struct {
 	count     int
 	flags     uint8
@@ -32,7 +32,7 @@ type mapextra struct {
 	oldoverflow *[]*bmap
 	nextOverflow *bmap
 }
-、、、
+```
 
 1. count: 表示当前哈希表中的元素数量；
 2. B: 表示当前哈希表持有的 buckets 数量，但是因为哈希表中桶的数量都 2 的倍数，所以该字段会存储对数，也就是 len(buckets) == 2^B；

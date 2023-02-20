@@ -3,23 +3,23 @@
 
 阅读本文将收获：
 
-、、、
+```
 理解GMP模型和多线程模型相比的优势
 理解协程调度的时机
 理解逻辑处理器P选取协程的策略
 理解如何处理协程长期霸占线程 (比如死循环)
 深刻理解系统调用，CPU上下文切换等基础知识
-、、、
+```
 
 ## GMP模型
 
 在`协程执行`这篇文章中，我们分享了Go协程的运行，其中涉及到GMP模型，这里再次复习一下：
 
-、、、
+```
 G: Goroutine, 表示go协程
 M: Manager, 表示操作系统的线程
 P: Processor, 表示逻辑处理器
-、、、
+```
 
 除此之外，还有一个组件叫做`调度器`，协程的执行流程：`调度器通过逻辑处理器P选择一个合适的协程G在线程上M运行`。
 
@@ -76,10 +76,10 @@ P: Processor, 表示逻辑处理器
 
 作为开发者，我们关心的线程调度的时机有:
 
-、、、
+```
 1. 线程时间片到期
 2. 系统调用
-、、、
+```
 
 ## 线程时间片到期
 
@@ -165,7 +165,7 @@ P: Processor, 表示逻辑处理器
 
 添加协程到队列的伪代码如下：
 
-、、、
+```
 func runqput(_p_ *p, gp *g, next bool) {
 	if randomizeScheduler && next && fastrand()%2 == 0 {
 		next = false
@@ -185,7 +185,7 @@ func runqput(_p_ *p, gp *g, next bool) {
 	    }
 	}
 }
-、、、
+```
 
 从队列中获取协程策略：
 
@@ -195,7 +195,7 @@ func runqput(_p_ *p, gp *g, next bool) {
 
 
 伪代码如下：
-、、、
+```
 func schedule() {
 	if gp == nil && gcBlackenEnabled != 0 {
 		gp = gcController.findRunnableGCWorker(_g_.m.p.ptr())
@@ -221,7 +221,7 @@ func schedule() {
 		gp, inheritTime = findrunnable()
 	}
 }
-、、、
+```
 
 
 ## 系统调用-阻塞调用
