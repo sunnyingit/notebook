@@ -19,7 +19,7 @@
 
 请看demo, 演示"只允许10个协程同时执行"：
 
-```
+、、、
 
 package main
 
@@ -75,7 +75,7 @@ func main() {
 	sem.Release(int64(maxWorkers))
 }
 
-```
+、、、
 
 
 在秒杀的场景中，我们可以用商品的总量初始化`NewWeighted`, 先使用`TryAcquire`模拟是否拿到抢购资格，
@@ -272,7 +272,7 @@ func (s *Weighted) TryAcquire(n int64) bool {
 
 最后，说一个小技巧，`semaphore`还可以模拟读写锁：
 
-```
+、、、
 // 加读锁
 Acquire(1)
 
@@ -284,4 +284,4 @@ Acquire(N)
 
 // 释放写锁
 Release(N)
-```
+、、、

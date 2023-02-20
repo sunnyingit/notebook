@@ -5,7 +5,7 @@
 
 这种情况下，我们可以使用`WaitGroup`达到目的：
 
-```
+、、、
 	var wg sync.WaitGroup
 
 	for _, url := range urls {
@@ -18,7 +18,7 @@
 
 	// Wait阻塞，直到等待所有的url请求完成
 	wg.Wait()
-```
+、、、
 
 `Add`之后执行的协程，我称之为【先行】协程，`Wait`之后执行的协程，我称之为【等待】协程。
 
@@ -37,7 +37,7 @@
 3. Wait(): 阻塞当前协程，直到【协程】协程的个数减少到0时才被唤醒。
 
 
-```
+、、、
 // 结构体
 type WaitGroup struct {
 	// sync.noCopy 是一个特殊的私有结构体
@@ -142,7 +142,7 @@ func (wg *WaitGroup) Wait() {
 	}
 }
 
-```
+、、、
 
 注意，Go的`Happen-Before`原则，`Wait`方法一定会在`Add`方法之后执行。所以保证正常情况下不会出异常: `panic("sync: WaitGroup is reused before previous Wait has returned")`
 

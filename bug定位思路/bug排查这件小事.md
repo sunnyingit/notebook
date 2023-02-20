@@ -50,9 +50,9 @@ rpc请求日志处理包括业务日志所有字段以外，还必须包括：
 
 我们将结合日志信息，分享问题排查思路。假如我们有一个错误日志app-name.log.2022012302,内容如下：
 
-```
+、、、
 ERROR: 2022-01-23 02:05:00 qid[2823482873] qid64x[a84aedf9] logid[2823482873] resp_code[0] cost[0] idc[idc-name] module[app-name] uri[/ab/cd?d=f] method[get] status[200] host[10.229.174.144:8210] client_ip[10.128.97.13] remote_ip[10.128.97.13] optime[1642874700393] refer[] protocol[HTTP/1.1] message [conf-file is not exsited]
-```
+、、、
 
 ### 业务bug
 业务问题相对比较好排查。遇到业务问题时，例如配置文件不存在，只需要通过调用方提供的logid和调用时间，此时只需要根据提供的logid找到对应的业务错误日志，查看日志的状态码和错误信息就可以定位到bug。
@@ -64,11 +64,11 @@ ERROR: 2022-01-23 02:05:00 qid[2823482873] qid64x[a84aedf9] logid[2823482873] re
 
 第二种情况，代码问题可能会导致进程crash down，由于进程可以被supervisor等进程托管，会自动拉起， 所以，我们需要确认进程是否重启：
 
-```
+、、、
 > ps -aux | grep app-name
 USER     PID    %CPU  %MEM   VSZ    RSS TTY   STAT START  TIME COMMAND
 work     125981  2.7  0.0 14322944 175356 ?   Sl   Jan22  72:31 app-name
-```
+、、、
 
 
 以上输出中，TIME：进程运行的时间；START：进程启动时间
@@ -82,7 +82,7 @@ work     125981  2.7  0.0 14322944 175356 ?   Sl   Jan22  72:31 app-name
 如果有OOM，对于Go进程而言，一般有协程阻塞，变量循环引用导致无法释放，申请超大内存，网络连接没有释放，文件句柄没有释放等情况。
 
 如果有协助阻塞，进程对应的线程也会持续增加，通过`cat /proc/pid/status`查看进程下面的线程数：
-```
+、、、
 cat /proc/223/status
 ....
 VmData:    71556 kB
@@ -93,7 +93,7 @@ VmPTE:       448 kB
 VmSwap:        0 kB
 Threads:        1 // 线程的数量
 SigQ:   2/94992
-```
+、、、
 如果线程数过大，则可以怀疑是协程阻塞，一般协程阻塞主要是协程的写入或者读取没有设置超时时间。
 
 如果确定了内存泄露，可以使用`go pprof`采集两次分配的内存，然后通过`go tool pprof -diff_base  xxx.alloc_space.inuse_objects.inuse_space.001.pb.gz xxx.alloc_objects.alloc_space.inuse_objects.inuse_space.002.pb.gz` 对比后，查找到分配内存最多的函数大概率是内存泄露的函数。
@@ -101,7 +101,7 @@ SigQ:   2/94992
 
 遇到代码并发读写问题，可以通过`go run  --race`检测出来：
 
-```
+、、、
 package main
 import "fmt"
 
@@ -132,7 +132,7 @@ Goroutine 6 (running) created at:
 ==================
 Found 1 data race(s)
 exit status 66
-```
+、、、
 
 ### 系统资源不足
 
@@ -178,13 +178,13 @@ exit status 66
 
 指令为：
 
-```
+、、、
 
 git:(master) ps aux | grep ae-app-179
 
 work 13897 0.9 0.7 1831288 189928 pts/3 Sl+ 20:00 0:33 ./bin/ae-app-179
 
-```
+、、、
 
 20:00 表示实例启动时间，0:33 表示已经运行的时间。如果这两个时间和预期不匹配，则说明实例有被重启。
 
@@ -237,7 +237,7 @@ pidstat -T
 
 使用命令如下：
 
-```
+、、、
 
 // rpc请求日志如下
 
@@ -254,7 +254,7 @@ cat ae-app-548.log.2021123111  | awk '{ret=match($0, /result_code\[([0-9]+)\].*v
 // 查看故障时间内，rpc服务对应的超时时间，重试次数, 超时时间大于50ms。
 cat rpc.log | awk '{ret=match($0, /service(\[[a-zA-Z\-]*\]).*(retry\[[0-9/]*\]).*cost\[([0-9/\.]*)\]/, any); if (any[2] > 50) print any[1], any[2], any[3]}'
 
-```
+、、、
 通过日志发现了rpc的相关问题，则需要重新配置合理的参数，其次需要验证rpc远程服务是否正常。
 
 如何根据这些指标判断io瓶颈呢？

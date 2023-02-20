@@ -2,11 +2,11 @@
 
 
 理解interface，只需要理解两句话：
-```
+、、、
 1. interface是一种变量类型，interface类型只是interface类型，而不是任意的变量类型
 
 2. interface和其他变量类型在满足某种条件下，可以相互转换
-```
+、、、
 
 第一句话纠正我之前的一个理解误区，认为`interface`可以表示任意类型，实际上不是。
 
@@ -18,7 +18,7 @@
 
 场景1: 不确定输入或者返回数据的类型，例如：
 
-```
+、、、
 package main
 
 import "fmt"
@@ -50,16 +50,16 @@ func main() {
 	fmt.Println(appendEverything([]string{"hello", "world"}))
 }
 
-```
+、、、
 
 场景2：需要把json转为struct，如果json数据是如下:
-```
+、、、
 {
     "data": ["hello world", 1234566]
 }
-```
+、、、
 这种情况，`data`是一个数组，但是数组内的元素类型不是确定的，这种情况定义`struct`结构体如下：
-```
+、、、
 type Response struct {
     // 定义结构体，注意元素是interface表示类型不确定
 	Data []interface{} `json:"data"`
@@ -71,11 +71,11 @@ val := Reponse.Data
 // 通过类型断言获取原始数据的值
 v0, ok := val[0].(string)
 v1, ok := val[0].(float64)
-```
+、、、
 
 场景3: 业务抽象。把一个业务场景的核心逻辑抽象出来，定义成一个特定的interface, 我们实现一个稍微复杂但会经常用到的模式-观察者模式:
 
-```
+、、、
  // 定义一个被处理的对象
 type Collector interface {
     Collect()
@@ -111,7 +111,7 @@ func test(o Observer, c Collector) {
     // 通知
     o.notify(c)
 }
-```
+、、、
 
 如果一个`observer`变量类型，同时实现了`Register`, `Unregister`, `Notify`
 这三个方法，那就代表他实现了`interface`， 【那么`observer`变量就可以作为参数传递给`test`函数作为其参数】
@@ -120,7 +120,7 @@ func test(o Observer, c Collector) {
 
 我们可以试着自定义一个变量类型来实现observer需要的3个方法
 
-```
+、、、
 type Registry struct {
     Collectors  []Collector
 }
@@ -158,7 +158,7 @@ type WeatherObserver struct {
 
 // 使用：WeatherObserver可以作为参数传递给test函数
 test(WeatherObserver)
-```
+、、、
 
 这里再次明确一个结论:
 >如果一个变量类型实现了某个interface定义的所有方法，则表示变量类型实现了该interface
@@ -178,7 +178,7 @@ test(WeatherObserver)
 通过【类型断言】，`interface`对象又可以转换为特定的类型对象，上面的例子中`val[0].(string)` 就是把interface转换成`string`类型
 
 类型断言的格式有两种:
-```
+、、、
 // 格式1：原始数据, ok := interface类型.(需要装换的类型)
 v, ok := v.(string)
 
@@ -186,34 +186,34 @@ v, ok := v.(string)
 switch t := v.(type) {
 	case int:
 }
-```
+、、、
 
 这样看来，文中3个使用场景，其本质上都是一个场景, interface类型和某种变量类型相互转换
 
 除了interface类型转换以外，我们还需要关注的点是，interface类型可以调用其定义的方法，例如在`test`中调用`o.Register(c)`
 
 那我们有没有考虑2个问题:
-```
+、、、
 1. 为什么interface类型可以和其他类型相互装换
 2. interface是如何调用其定义的方法，其方法输入参数有哪些
-```
+、、、
 搞清楚这2个问题，基本就理解了`interface`原理，嗯，一个一个来。
 
 ## interface原理
 
 之前我们说到，interface是一种变量类型，它有两种结构，一种是没有定义任何方法, 其数据结构如下:
-```
+、、、
 // 只有两个指针，每个指针8bytes, 一共16bytes
 type eface struct {
     _type *_type
     data  unsafe.Pointer
 }
-```
+、、、
 `_type` 指向原始的变量类型，`data`指向原始的数据值。
 
 那`interface`是什么时候初始化的呢，意识到这个问题很关键，答案是【把其他类型的值赋值给一个空的接口类型时候，初始化interface的结构体】
 
-```
+、、、
 package main
 
 import (
@@ -241,13 +241,13 @@ type:<nil>, value:<invalid reflect.Value>
 
 // 赋值之后，_type是string, data是hello world
 type:string, value:hello world%
-```
+、、、
 说到这里，如果一个类型赋值给interface类型，或者一个类型作为参数传递给interface类型，那么就会初始化inteface类型，注意是【初始化】，而不是【类型转换】。
 
 还需要注意的是，【初始化】data指针是把原始的值拷贝一份，如果data超过8个字节(64), 那么这份拷贝值会放到堆上，否则放到栈上，data指针指向拷贝后的地址。
 
 还有一种interface定义了相关方法，其数据结构如下:
-```
+、、、
 // 也是16字节
 type iface struct {
     tab  *itab
@@ -262,7 +262,7 @@ type itab struct {
     _     [4]byte
     fun   [1]uintptr // 保存所有定义的函数，使用一个数组是因为可以通过地址偏移推断出其他的函数
 }
-```
+、、、
 
 `iface.itab.fun` 的方法是在编译期间生成的。go语言在编译期间，会为所有的内置类型和所有的interface类型都生成一份`itab`数据，这里最重要的就是`fun`指针的初始化
 
@@ -288,7 +288,7 @@ go在运行期间，执行【类型断言】，就会发生类型转换，再次
 ## interface与nil
 
 interface 只有当`data`和`_type` 或者是`data`和`_itab`都为空，interface才是`nil`
-```
+、、、
 package main
 
 type TestStruct struct{}
@@ -309,7 +309,7 @@ func main() {
 
 $ go run main.go
 non-nil
-```
+、、、
 
 ## ⽅法和方法集
 
@@ -322,7 +322,7 @@ non-nil
 3. 不支持方法重载
 4. 可用实例的value和pointer调用方法，编译器会自动转换
 
-```
+、、、
 package main
 
 import "fmt"
@@ -338,7 +338,7 @@ func main() {
 	a = "MyName"
 	a.l()
 }
-```
+、、、
 
 ## 方法集
 

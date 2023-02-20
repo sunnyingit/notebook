@@ -28,7 +28,7 @@ API熔断后，可以保护数据库等基础服务不受`unhealth`的API的影�
 `metrics_rollingsize`
 
 具体算法如下：
-```
+、、、
 设定metrics_rollingsize=5，初始化数据
 [0, 0, 0, 0, 0]
 每一位代表在metrics_granularity内出错的次数
@@ -38,11 +38,11 @@ API熔断后，可以保护数据库等基础服务不受`unhealth`的API的影�
 
 当向前偏移的位超过了5，则去掉最前面的数据，然后在后面补位，保证这个数组的长度总是5位
 [11, 123, 99, 11, 0]
-```
+、、、
 这种方式类似于一个滑动窗口，每过`metrics_granularity`的时间，窗口向前滑动一格。
 
 参考代码：
-```
+、、、
 class RollingNumber(object):
 
     def __init__(self, rolling_size, granularity=1):
@@ -91,9 +91,9 @@ if __name__ == '__main__':
         print repr(rolling)
 
 
-```
+、、、
 使用一个全局的dict保存每个API访问的结果，参考代码：
-```
+、、、
 counters = {}
 
 
@@ -111,11 +111,11 @@ def get(key, default=0):
     if key in counters:
         return counters[key].value()
     return default
-```
+、、、
 
 ## API状态检测算法
 
-```
+、、、
 def is_healthy(service, func):
     key_base = '{0}.{1}'.format(service.name, func.func_name)
     key_request = '{0}'.format(key_base)
@@ -134,7 +134,7 @@ def is_healthy(service, func):
             ((sys_excs / float(requests)) < THRESHOLD_SYS_EXC) and \
             ((unkwn_exc / float(requests)) < THRESHOLD_UNKWN_EXC)
     return True
-```
+、、、
 
 ### 熔断算法
 定义API有三种状态 `lock`, `unlock`, `recovery`
@@ -150,7 +150,7 @@ def is_healthy(service, func):
 4，如果API的`lock`状态持续时间大于`MAX_RECOVERY_TIME`,则直接返回到`unlock`
 
 参考代码：
-```
+、、、
 locks = defaultdict(dict)
 # 使用服务名和函数名来确定唯一的API
 key = '{0}.{1}'.format(service.name, func.func_name)
@@ -202,14 +202,14 @@ elif locked_status == MODE_RECOVER:
        # 重新锁住
        locks[key]['locked_at'] = time.time()
        locks[key]['locked_status'] = MODE_LOCKED
-```
+、、、
 
 ### 统计机制
 当目前位置，我们知道了然后判断一个API是否健康已经熔断的策略，现在需要关心的问题是，怎么去统计API的`key_timeout key_sys_exc, key_unkwn_exc`等指标的次数
 
 目前我们采用的是使用`blinker`模块的`signal`, 大致流程如下：
 
-```
+、、、
 # signal只罗列一部分，原理都一样的，类似一种回调机制
 def register_signals():
     signals.after_api_called.connect(
@@ -241,6 +241,6 @@ class service(object):
 
         finally:
              signals.after_api_called.send(ctx)
-```
+、、、
 
 收工。

@@ -7,7 +7,7 @@
 
 Go的`Sync.Mutex`包提供了`Lock`和`Unlock`两个函数，分别用于加锁和解锁，使用非常简单：
 
-```
+、、、
 func main() {
 
 	source := map[string]string{
@@ -34,7 +34,7 @@ func main() {
 	}
 }
 
-```
+、、、
 
 分析互斥锁原理之前，我们需要了解和锁的相关概念
 
@@ -82,7 +82,7 @@ Go的`runtime`包自带函数`runtime_Semrelease`, `runtime_SemacquireMutex` 已
 
 Go [实现](https://github.com/golang/go/commit/dd2074c82acda9b50896bf29569ba290a0d13b03?branch=dd2074c82acda9b50896bf29569ba290a0d13b03&diff=split) 如下：
 
-```
+、、、
 type Mutex struct {
 	// key的值表示锁的状态 0: 未加锁 1: 加锁
 	key  int32
@@ -113,7 +113,7 @@ func (m *Mutex) Unlock() {
 	// 通知阻塞的协程尝试去获取锁
 	runtime.Semrelease(&m.sema)
 }
-```
+、、、
 
 此版本存在的问题是，一旦加锁失败就陷入阻塞状态，而此时有可能其他goroutine释放了锁，理论上如果此时再尝试去获取锁时会成功，也就是无须陷入阻塞状态。
 
@@ -124,7 +124,7 @@ func (m *Mutex) Unlock() {
 
 请看升级版代码：
 
-```
+、、、
 type Mutex struct {
     // 锁的状态： 0：未加锁， 1：加锁，2：有woken的协程在尝试获取锁
     // state右移mutexWaiterShift表示阻塞协程的数量
@@ -233,7 +233,7 @@ func (m *Mutex) Unlock() {
 	}
 }
 
-```
+、、、
 
 这一版对比【简洁版】主要的升级是真正引入锁的状态，而且还记录了阻塞协程数量，可以尽量减少`Semrelease`, `Semacquire` 这类【系统调用】操作，同时最大程度避免了【上下文开销】。
 
@@ -243,7 +243,7 @@ func (m *Mutex) Unlock() {
 
 下面，我们来看下Go终极实现，也就是现在`Sync.Mutex`的实现：
 
-```
+、、、
 type Mutex struct {
 	state int32
 	sema  uint32
@@ -470,7 +470,7 @@ func (m *Mutex) unlockSlow(new int32) {
 	}
 }
 
-```
+、、、
 【终极版】相对于【升级版】，主要是增加了协程的【spin】昨天，同时如果某个协程等锁等到快饿死的时候，能优先获取到锁，这个机制解决了锁的公平性问题。
 
 
