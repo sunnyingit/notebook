@@ -157,3 +157,127 @@ Input: n = 3Output: ["((()))","(()())","(())()","()(())","()()()"]
 Example 2:
 Input: n = 1Output: ["()"]
 ```
+
+此题的可选择项是需要画出类似于"()"，"()()", "(())"这样的组合，我们可以观察到：
+1. 必须先画"("，当画了"("之后，还有两种选择：可以画"("和")"
+2. 类似画"())"这样的组合不满足条件，也就说画")"的个数不能超过"("，否则不满足条件
+3. 当")"画完之后，才终止
+
+使用left和right来分别保存可以画"("和")"的次数是本题的关键，当right=0的时候终止递归调用。
+
+```
+class Solution(object):
+    def generateParenthesis(self, n):
+        """
+        :type n: int
+        :rtype: List[str]
+        """
+        left = right = n
+
+        ans = []
+        path = ""
+        self.dfs(left, right, path, ans)
+
+        return ans
+
+    def dfs(self, left, right, path, ans):
+        # right为0的时候，表示画完了
+        if right == 0:
+            ans.append(path)
+            return
+
+        # 第一个选择是可以画"("
+        if left > 0:
+            self.dfs(left-1, right, path + "(", ans)
+
+        # 第二个选择是可以画")"，画")"的次数不能超过"("，也就是right不能超过left，否则不能选择画")"
+        if right > left:
+            self.dfs(left, right-1, path + ")", ans)
+```
+
+
+### 78. Subsets
+
+```
+Given an integer array nums of unique elements, return all possible subsets (the power set).
+The solution set must not contain duplicate subsets. Return the solution in any order.
+ 
+Example 1:
+Input: nums = [1,2,3]
+Output: [[],[1],[2],[1,2],[3],[1,3],[2,3],[1,2,3]]
+
+Example 2:
+Input: nums = [0]
+Output: [[],[0]]
+
+```
+
+思路： 以1开头的path有：[1],[1,2],[1,2,3], 以2开头的有[2], [2,3]，以3开头的有[3]。
+和46题不一样的是，选择1之后，可选项是nums[1:]， 选择2之后可选项是nums[2:], 选择3之后，可选的nums为空。
+
+怎么去实现每次nums的变化呢，有两种方式：
+
+```
+# 使用i表示开始选择nums的范围，i每次都会+1
+for i in xrange(i, len(nums)):
+    self.dfs(ans, path + [nums[i]], i+1, nums)
+
+# 直接改变nums
+for i in xrange(len(nums)):
+    self.dfs(ans, path + [nums[i]], nums[i+1:])
+```
+
+最终算法如下：
+```
+class Solution(object):
+    def subsets(self, nums):
+        """
+        :type nums: List[int]
+        :rtype: List[List[int]]
+        思路： 以1开头的path有：[1],[1,2],[1,2,3], 以2开头的有[2], [2,3]，以3开头的有[3]
+        """
+        ans, path = [], []
+
+        self.dfs(ans, path, 0, nums)
+
+        return ans
+
+    def dfs(self, ans, path, i, nums):
+
+        ans.append(path)
+
+        if i == len(nums):
+            return
+
+        for i in xrange(i, len(nums)):
+            self.dfs(ans, path + [nums[i]], i+1, nums)
+
+
+    # 第二种解法
+    def dfs(self, ans, path, nums):
+        ans.append(path)
+
+        # 以1开头的时候，最后i=2时，选择的是3，此时就可以结束了
+        if len(nums) == 0:
+            return ans
+
+        # 选择只能从1到2到3，然后2到3，然后3
+        for j in xrange(len(nums)):
+            self.dfs(ans, path+[nums[j]], nums[j+1:])
+```
+
+### 131. Palindrome Partitioning
+```
+Given a string s, partition s such that every substring of the partition is a palindrome.
+Return all possible palindrome partitioning of s.
+
+Example 1:
+
+Input: s = "aab"
+Output: [["a","a","b"],["aa","b"]]
+Example 2:
+
+Input: s = "a"
+Output: [["a"]]
+```
+首先，如果不考虑组合的子字符串有[a, a, b], [aa, b], [aab], [a, ab]，首先我们需要搞清楚如何构建这些子字符串。
