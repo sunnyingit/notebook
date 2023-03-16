@@ -1,3 +1,204 @@
+# 链表
+链表的题型主要有三大类:
+1. 链表是否有环。
+2. 链表节点删除。
+3. 链表节点翻转。
+
+
+## 链表有环判断
+
+### 141. Linked List Cycle
+```
+Given head, the head of a linked list, determine if the linked list has a cycle in it.
+
+There is a cycle in a linked list if there is some node in the list that can be reached again by continuously following the next pointer. Internally, pos is used to denote the index of the node that tail's next pointer is connected to. Note that pos is not passed as a parameter.
+
+Return true if there is a cycle in the linked list. Otherwise, return false.
+```
+
+思路: 快慢指针，在一个圆圈里面跑，快慢指针一定会相遇。
+
+```
+class Solution(object):
+    def hasCycle(self, head):
+        """
+        :type head: ListNode
+        :rtype: bool
+        """
+        fast = slow = head
+
+        while fast and fast.next:
+            fast = fast.next.next
+            slow = slow.next
+
+            if slow == fast:
+                return True
+        return False
+```
+
+
+### 142. Linked List Cycle II
+
+```
+Given the head of a linked list, return the node where the cycle begins. If there is no cycle, return null.
+
+There is a cycle in a linked list if there is some node in the list that can be reached again by continuously following the next pointer. Internally, pos is used to denote the index of the node that tail's next pointer is connected to (0-indexed). It is -1 if there is no cycle. Note that pos is not passed as a parameter.
+
+Do not modify the linked list.
+```
+
+思路:
+1. 找到到快慢指针相遇的节点
+2. 分别从head到相遇的节点开始走，他们再次相遇的地方就是环的起点。
+3. 这是个数学题，参考视频：https://www.youtube.com/watch?v=UkKBPGt5Nok
+
+
+```
+class Solution(object):
+    def detectCycle(self, head):
+        """
+        :type head: ListNode
+        :rtype: ListNode
+
+        """
+
+        fast = slow = head
+
+        while fast and fast.next:
+            fast = fast.next.next
+            slow = slow.next
+
+            if slow == fast:
+                break
+
+        # 注意
+        if not fast or not fast.next:
+            return
+
+        # 再次相遇的点就是环的启动
+        p = head
+        while p != slow:
+            p = p.next
+            slow = slow.next
+        return
+```
+
+## 链接节点删除
+
+### 19. Remove Nth Node From End of List
+
+```
+Given the head of a linked list, remove the nth node from the end of the list and return its head.
+Input: head = [1,2,3,4,5], n = 2
+Output: [1,2,3,5]
+```
+思路：
+1. 本题的关键是找到node(4)，通常能想到的方法是计算list的长度, 第二种方法是快慢指针，快指针先走N步，然后快慢指针一起走，直到快指针走完。
+2. 特殊情况是n等于list的长度，返回的是head.next的值
+
+```
+class Solution(object):
+    def removeNthFromEnd(self, head, n):
+        """
+        :type head: ListNode
+        :type n: int
+        :rtype: ListNode
+
+        """
+
+        fast = slow = head
+
+        while n > 0:
+            fast = fast.next
+            n -= 1
+
+        if not fast:
+            return head.next
+
+        # 这里条件判断容易错误的写成while fast:
+        while fast.next:
+            fast = fast.next
+            slow = slow.next
+
+        slow.next = slow.next.next
+        return head
+```
+
+
+### 82. Remove Duplicates from Sorted List II
+```
+Given the head of a sorted linked list, delete all nodes that have duplicate numbers, leaving only distinct numbers from the original list. Return the linked list sorted as well.
+
+Input: head = [1,2,3,3,4,4,5]
+Output: [1,2,5]
+
+Input: head = [1,1,1,2,3]
+Output: [2,3]
+```
+思路：
+1. 可能会删除第一个节点，所以必须设置dummy和pre指向head
+2. 比较相邻的node的值，直到不相等为止
+3. 比如list=-1->1， pre=Node(-1)则不需要删除，必须pre.next.next存在时才可能会删除，所以遍历终止条件是：pre and pre.next and pre.next.next都不为空
+
+```
+class Solution(object):
+    def deleteDuplicates(self, head):
+        """
+        :type head: ListNode
+        :rtype: ListNod
+        1. 对比cur.val和next.val的值，如果相等，需要通过while一直比较直到不相等为止。
+        2. 结束条件 pre and pre.next and pre.next.next
+        """
+        dummy = pre = ListNode(-1, head)
+
+        # -1->1 只有一个元素就不用再删除了
+        while pre and pre.next and pre.next.next:
+            cur = pre.next
+            n = cur.next
+
+            # -1->1->1->1->1->2 需要考虑有多个1的情况下删除
+            # 必须判断这种情况
+            if cur.val == n.val:
+                while n and n.val == cur.val:
+                    n = n.next
+                pre.next = n
+            else:
+                pre = pre.next
+
+        return dummy.next
+```
+
+### 83. Remove Duplicates from Sorted List
+```
+Given the head of a sorted linked list, delete all duplicates such that each element appears only once. Return the linked list sorted as well.
+
+Input: head = [1,1,2]
+Output: [1,2]
+
+```
+思路：依次比较相邻的两个节点即可。
+
+```
+class Solution(object):
+    def deleteDuplicates(self, head):
+        """
+        :type head: ListNode
+        :rtype: ListNode
+        """
+        cur = head
+
+        while cur and cur.next:
+            n = cur.next
+
+            if cur.val == n.val:
+                cur.next = n.next
+            else:
+                cur = cur.next
+
+        return hea
+```
+
+
 ## 链表节点翻转
 
 ### 206. Reverse Linked List
@@ -5,6 +206,7 @@
 ```
 Given the head of a singly linked list, reverse the list, and return the reversed list.
 ```
+
 思路：遍历list修改每个node的next指向，遇到需要改变node指向的题目，大部分情况都需要设置一个newHead变量。
 
 ```
