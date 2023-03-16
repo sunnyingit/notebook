@@ -6,6 +6,11 @@ BackTracking 是一种搜索算法，其算法公式如下：
 3. Target: 完成搜索目标
 
 
+主要题类型有:
+1. 字符串的全排列
+2. 构建特殊子字符串，回文字符串，合法ip
+3. 爬格子，比如word search, island search， queeen放置之类的
+
 BackTracking算法不能解决最多，最长，最少类似这样的问题，这种问题一般需要通过动态规划的方式解决。
 
 ### 46. Permutations
