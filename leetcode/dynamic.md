@@ -90,3 +90,87 @@ class Solution(object):
 
         return max(dp)
 ```
+
+### 70. Climbing Stairs
+
+you are climbing a staircase. It takes n steps to reach the top.
+Each time you can either climb 1 or 2 steps. In how many distinct ways can you climb to the top?
+
+思路：
+1. dp[i] 表示从0到i有多少种走法
+2. 到第i台阶方法可以从i-1台阶走一步，也可以从i-2台阶走两步到台阶i， 所以dp[i] = dp[i-1] + dp[i-2]
+
+```
+class Solution(object):
+    def climbStairs(self, n):
+        """
+        :type n: int
+        :rtype: int
+        """
+
+        if n <= 1:
+            return n
+
+        dp = [0 for _ in range(n)]
+        dp[0] = 1
+        dp[1] = 2
+
+
+        if n <= 2:
+            return dp[n-1]
+
+
+        for i in xrange(2, n):
+            dp[i] = dp[i-1] + dp[i-2]
+
+        return dp[n-1]
+
+```
+
+
+### 746. Min Cost Climbing Stairs
+
+```
+You are given an integer array cost where cost[i] is the cost of ith step on a staircase. Once you pay the cost, you can either climb one or two steps.
+
+You can either start from the step with index 0, or the step with index 1.
+
+Return the minimum cost to reach the top of the floor.
+
+Example 1:
+
+Input: cost = [10,15,20]
+Output: 15
+Explanation: You will start at index 1.
+- Pay 15 and climb two steps to reach the top.
+The total cost is 15.
+```
+
+本题求解到达顶点需要的最少的cost, 思路：
+1. 主要思路是从计算好从倒数第一个，或者第二个位置走到顶端需要最短的距离, 然后在计算从后面的位置走到倒数第二个或者倒数第一个最多的距离
+1. 到底顶点有两种走法，由cost[i]走一步到顶，或者cost[i-1]走两步，到达顶点的最小dp[i] = min(cost[i+1], cost[i+2])
+2.
+
+```
+class Solution(object):
+    def minCostClimbingStairs(self, cost):
+        """
+        :type cost: List[int]
+        :rtype: int
+        """
+
+        if not cost:
+            return 0
+        # [2, 5, 10, 0] 达到0才是顶端，达到0有两种走法，一步或者两步
+        # 可以从5走两步到0，也可以从20走一步到0，开销分别是5和20
+        # 从i到下一个节点有两种走法：
+        # cost[i] = cost[i] + min(cost[i+1], cost[i+2])
+        cost.append(0)
+
+        for i in range(len(cost) - 3, -1, -1):
+            # 从向前走两步的消耗是到达cost[i]的费用加上min(cost[i+1], cost[i+2])
+            cost[i] += min(cost[i+1], cost[i+2])
+
+
+        return min(cost[0], cost[1])
+```
