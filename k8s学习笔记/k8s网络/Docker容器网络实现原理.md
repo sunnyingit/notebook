@@ -1,4 +1,4 @@
-# 虚拟网桥和容器网络实现原理
+# Docker容器网络实现原理
 
 ## 概述
 
@@ -198,7 +198,7 @@ sudo ip route add 192.168.1.0/24 via <虚拟网桥的IP地址>
 8. 最终Container1就拿到了Container2的MAC地址，就可以完成通信了。
 
 
-万变不离其宗，只要我们掌握了[网络知识体系构建](https://github.com/sunnyingit/notebook/blob/master/k8s%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/k8s%E7%BD%91%E7%BB%9C/%E7%BD%91%E7%BB%9C%E4%BD%93%E7%B3%BB%E6%9E%84%E5%BB%BA%E5%AF%BC%E8%AF%BB.md），我们就能很清楚的掌握Docker的网桥模式。
+万变不离其宗，只要我们掌握了[网络知识体系构建](https://github.com/sunnyingit/notebook/blob/master/k8s%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/k8s%E7%BD%91%E7%BB%9C/%E7%BD%91%E7%BB%9C%E4%BD%93%E7%B3%BB%E6%9E%84%E5%BB%BA%E5%AF%BC%E8%AF%BB.md)，我们就能很清楚的掌握Docker的网桥模式。
 
 
 2. 容器如何访问宿主机，例如Container1如何访问Host?
