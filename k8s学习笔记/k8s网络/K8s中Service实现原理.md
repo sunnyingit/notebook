@@ -292,11 +292,12 @@ spec:
 ```
 
 1. 当Client访问Pod1(10.168.0.1) 的时候，有可能Pod1所在的主机并没有，于是通过iptables把请求转发给Pod2 10.168.10.2。
-2. Pod2接受请求后，处理请求完成后，需要响应请求，他从请求报文中发现源ip地址是192.168.0.1，也就是Client的ip。
-3. 根据网络层协议，Pod2把数据返回给Client，但在Client看来，它请求的是(10.168.0.1)，是无法处理(10.168.10.2)的响应数据的。
+2. Pod2接受请求后，处理请求完成后，需要把数据返回给客户端，他从请求报文中发现源ip地址是192.168.0.1，也就是Client的ip。
+3. Pod2会询问Client的MAC地址，后续会经过一系列交换机和路由器，最终拿到Client的MAC地址，然后把数据发回给Client。
+3. 在Client应用程序看来，它请求的是(10.168.0.1)，是无法处理(10.168.10.2)的响应数据的。
 
 特别注意使用iptables的是转发网络数据时*网络层层转发*，这种情况和Nginx这样的转发不一样，Nginx是*应用层转发*。
-应用层的转发，说白了就是重新构建一个连接，这个过程中源地址会改成Nginx所在的ip，而不是源client的ip。当然源client的ip也可以传递下去，但是创建连接用的是Nginx的ip。
+应用层的转发，说白了就是重新构建一个连接，这个过程中源地址会改成Nginx所在的ip，而不是源client的ip。当然源client的ip也可以通过其他方式传递下去。
 
 如果避免这种这种问题呢？
 
@@ -309,6 +310,9 @@ spec:
 ```
 
 当然，这个SNAT操作只需要对 Service 转发出来的 IP 包进行，否则普通的 IP 包就被影响了。而iptables做这个判断的依据，就是查看该 IP 包是否有--mark 0x4000/0x4000 的标志。
+
+我们在深入思考一下，为什么IP模式下，也使用了iptable就行转发，是否也需要做SNAT操作？
+
 
 ## ExternalTrafficPolicy配置
 在使用NodePort模式下，会对Client ip进行改写。对于Pod需要明确知道所有请求来源的场景来说，这是不可以的。
@@ -399,11 +403,6 @@ my-service   LoadBalancer   10.43.201.184  123.456.789.10  80:31826/TCP,443:3049
 2. kubectl describe services example-service
 ```
 
-
-
-
-
-
 ## DNS服务器
 
 在 K8s中，CoreDNS 是一个开源的、轻量级的 DNS 服务器，它被用作 k8s 集群中的默认 DNS 服务。
@@ -456,7 +455,5 @@ Service和Pod都会被分配对应的 DNS A 记录，A记录就是从域名解�
 1. 学习了Netfilters的原理和配置规则。
 2. 学了Service的虚拟IP实现原理。
 3. 学习了Service的IPVS的实现原理。
+4. Service支持集群外访问的实现：NodePort，LoadBalancer，ExternalName
 4. 学了Service, Pod的DNS A记录。
-5. 网络异常的排查情况
-
-如果我们需要在集群外访问Service，怎么实现呢？
