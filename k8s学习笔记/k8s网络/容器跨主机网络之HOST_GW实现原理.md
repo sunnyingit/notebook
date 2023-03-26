@@ -2,9 +2,13 @@
 
 容器跨宿主主机访问是指容器访问另一个宿主机上的容器。很显然，最基本的前提是*宿主机之间能相互访问*。
 
-我在[网络知识体系构建]()一文中提到一个设想，我们是否可以动态修改路由表来实现网络的转发。
+我在[网络知识体系构建](https://github.com/sunnyingit/notebook/blob/master/k8s%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/k8s%E7%BD%91%E7%BB%9C/%E5%9F%BA%E7%A1%80%E7%BD%91%E7%BB%9C%E7%9F%A5%E8%AF%86%E4%BD%93%E7%B3%BB%E6%9E%84%E5%BB%BA.md)一文中提到一个设想，我们是否可以动态修改路由表来实现网络的转发。
 
-今天要分享的Flannel 的 host-gw 模式就是通过修改路由表来实现的。
+今天要分享的Flannel 的 host-gw 模式实现了容器跨主机网络的访问。
+
+理解跨主机网络模式需要的知识储备是：
+1. [Docker容器网络实现原理](https://github.com/sunnyingit/notebook/blob/master/k8s%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/k8s%E7%BD%91%E7%BB%9C/Docker%E5%AE%B9%E5%99%A8%E7%BD%91%E7%BB%9C%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86.md)。
+2. 路由表转发规则。
 
 
 ## 路由表
@@ -12,12 +16,16 @@
 
 "ip route" 命令的输出通常显示操作系统的 IP 路由表，其中列出了每个网络目的地和它们应该使用的下一跳。
 
+下一跳地址就是把数据转发的下一个IP地址。
+
 以下是一个可能的输出示例：
 
+```
 default via 192.168.1.1 dev eth0 proto static metric 100
 10.0.0.0/8 via 192.168.2.1 dev eth1 proto static metric 200
 192.168.1.0/24 dev eth0 proto kernel scope link src 192.168.1.10 metric 100
 192.168.2.0/24 dev eth1 proto kernel scope link src 192.168.2.10 metric 200
+```
 
 这个输出中包含了四个路由表项，每个表项由不同的字段组成，解释如下：
 
@@ -29,29 +37,37 @@ default via 192.168.1.1 dev eth0 proto static metric 100
 6. 源IP地址：表示与网络接口相关联的本地IP地址，通常由内核自动添加。
 
 
-default via 192.168.1.1 dev eth0 proto static metric 100 解释如下：
-
+```
+default via 192.168.1.1 dev eth0 proto static metric 100
+```
+解释如下：
 1. default：表示这是默认路由表项，也就是当没有其他路由表项与目标地址匹配时，应该使用该路由表项发送数据包。
 2. via 192.168.1.1：表示下一跳网关的 IP 地址，也就是该数据包要通过哪个网关发送。
 3. dev eth0：表示使用哪个网络接口连接到下一跳路由器，这里是使用 eth0 网卡。
 4. proto static：表示该路由表项是静态路由，即手动配置的路由，而不是通过动态路由协议自动学习的路由。
 5. metric 100：表示该路由表项的度量值，通常用于区分优先级。在默认路由中，通常将度量设置为较小的值，以确保它优先于其他路由表项。
 
-
-92.168.2.0/24 dev eth1 proto kernel scope link src 192.168.2.10 metric 200 解释如下：
+```
+92.168.2.0/24 dev eth1 proto kernel scope link src 192.168.2.10 metric 200
+```
+解释如下：
 
 1. proto kernel：表示该路由表项是内核自动生成的路由，也就是由 Linux 内核根据系统配置和网络拓扑自动生成的路由。
 2. scope link：表示这个路由表项只适用于本地网络接口，也就是本地主机上的网络设备。
 3. src 192.168.2.10：表示这个路由表项的源 IP 地址，用于指定将要使用这个路由的数据包的源地址。
 
-因此，该路由表项的含义是：当需要将数据包发送到 192.168.2.0/24 网络范围内的目标地址时，使用 eth1 网络接口，并将源 IP 地址设置为 192.168.2.10。
+因此，该路由表项的含义是：当需要将数据包发送到 192.168.2.0/24 网络范围内的目标地址时，使用 eth1 网络接口，并将源IP地址设置为 192.168.2.10。
 
-由于这是内核自动生成的本地网络路由，因此度量值比静态路由高，为 200。
+由于这是内核自动生成的本地网络路由，因此度量值比静态路由高，为200。
+
+这里有个问题：为什么我们需要修改源IP地址？ 这个问题先放一放，我们接着往下看。
 
 
 ## 准备工作
 
 我们先构建一个跨主机的网络，如图所示：
+
+```
 
 
                    +------------------------------------------------------+
@@ -85,7 +101,7 @@ default via 192.168.1.1 dev eth0 proto static metric 100 解释如下：
 | +-----------+         +------------+   |             |                                         |
 | ip:192.168.0.2/24     ip:192.168.0.3/24|             |                                         |
 +----------------------------------------+             +-----------------------------------------+
-
+```
 
 这是一个简单的网络拓扑，其中有两个主机Host1和Host2，以及四个容器Container1、Container2、Container3和Container4。
 
@@ -94,17 +110,153 @@ default via 192.168.1.1 dev eth0 proto static metric 100 解释如下：
 3. 容器Container3和Container4分别连接到主机Host2的Cni0虚拟交换机上，使用Brigde模式。
 
 
-Cni0虚拟网卡是K8s初始化的时候，在每个宿主机器上创建的网卡，类似于Docker创建的Docker0交换机。
+如果看不懂这个网路部署，请自行复习[Docker容器网络实现原理](https://github.com/sunnyingit/notebook/blob/master/k8s%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/k8s%E7%BD%91%E7%BB%9C/Docker%E5%AE%B9%E5%99%A8%E7%BD%91%E7%BB%9C%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86.md)。
 
-Docker Brigde模式请查看[虚拟网桥和容器网络实现原理]()
+这个网络和Docker唯一的区别是虚拟网卡由Docker0变成了Cni0。
 
-## 创建路由规则通信
+这个这个网络是通过K8s部署的，而不是Docker部署的，所以改成了Cni0，其他的原理都和一样。
+
+Cni0虚拟网卡是K8s初始化的时候，在每个宿主机器上创建的虚拟网卡，类似于Docker创建的Docker0虚拟交换机。
+
+## 创建路由规则
 我们要做的事情是让Container1跨子网访问Container3。
 
-在看[虚拟网桥和容器网络实现原理]()文章中，我们已经分享了Container1访问Host1，Host2访问Container3的原理。
+在[Docker容器网络实现原理](https://github.com/sunnyingit/notebook/blob/master/k8s%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/k8s%E7%BD%91%E7%BB%9C/Docker%E5%AE%B9%E5%99%A8%E7%BD%91%E7%BB%9C%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86.md)文章中，我们已经分享了Container1访问Host1，Host2访问Container3的原理。
 
-同时，Host1又可以访问Host2，因为他们在同一个子网内。
+> 如果不明白，请务必学习，否则你可能看不懂下文。
 
-所以，我们只需要实现：当Container1访问Host1是，Host1把数据转发给Host2就行啦。
+还有一个前提，Host1又可以访问Host2，因为他们在同一个子网内。
+
+所以，我们只需要实现：当Container1访问Host1时，Host1把数据转发给Host2就行啦。
 
 怎么转发呢，通过路由表呗。
+
+我们给Host1主机添加路由规则：
+```
+规则1：192.168.1.0/24 via 10.168.0.2 dev Eth0
+规则2：192.168.1.0/24 dev cni proto kernel scope link src 192.168.0.1 metric 200
+```
+解释一下：
+1. 规则1表示访问子网192.168.1.0/24的请求通过Eth0转发到网关10.168.0.2上，也就是Host2的ip。
+2. 规则2表示访问子网192.168.1.0/24的请求，修改源ip为192.168.0.1，也就是cni的ip
+
+那Container1(192.168.0.2)跨子网访问Container3(192.168.1.2)的过程如下：
+1. Container1发现目标地址不是一个网段，于是把数据转发给Cni0网卡。
+2. Cni0网卡在Host1上，于是Host1(10.168.0.1)拿到了转发的数据，发现目标IP(192.168.0.2)不是一个网段，于是查找路由表。
+3. Host1匹配到了规则1，于是把数据发送到了Host2上。
+4. Host2再把数据发送给了Container3。
+
+这样，我们就实现了容器跨主机网络。
+
+
+## Flannel的Host-Gw最终实现
+
+Flannel项目是CoreOS公司主推的容器网络方案。事实上，Flannel项目本身只是一个框架，真正为我们提供容器网络功能的，是Flannel的后端实现。
+而Flannel的Host-Gw网络模式就是上文我们讲的原理。
+
+简单来讲，k8s选择使用Flannel的Host-GW部署网络时，必要的步骤就是：
+
+1. 安装Flannel：使用kubectl命令行工具安装Flannel：
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+2. 使用Host-GW模式：
+通过创建kube-flannel-cfg.yml的配置文件指定host-gw模式
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-flannel-cfg
+  namespace: kube-system
+data:
+  cni-conf.json: |
+    {
+      "name": "cbr0",
+      "type": "flannel",
+      "delegate": {
+        "isDefaultGateway": true
+      }
+    }
+  net-conf.json: |
+    {
+      "Network": "10.244.0.0/16",
+      "Backend": {
+        "Type": "host-gw"
+      }
+    }
+```
+
+3. 将Flannel部署到Kubernetes集群中：
+```
+kubectl apply -f kube-flannel.yml
+kubectl apply -f kube-flannel-cfg.yml
+```
+
+其中kube-flannel.yml配置文件是创建Flannel对象需要的配置文件，其格式为：
+```
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kube-flannel-ds-amd64
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+spec:
+  selector:
+    matchLabels:
+      app: flannel
+  template:
+    metadata:
+      labels:
+        app: flannel
+    spec:
+      hostNetwork: true
+      containers:
+      - name: kube-flannel
+        image: quay.io/coreos/flannel:v0.14.0
+        command:
+        - /opt/bin/flanneld
+        args:
+        - --ip-masq
+        - --kube-subnet-mgr
+        - --iface=${NODE_NAME}-eth0
+        resources:
+          requests:
+            cpu: "100m"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: run
+          mountPath: /run
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+          readOnly: true
+      nodeSelector:
+        beta.kubernetes.io/arch: amd64
+      volumes:
+      - name: run
+        hostPath:
+          path: /run
+      - name: flannel-cfg
+        configMap:
+          name: kube-flannel-cfg
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+```
+
+4. 测试Flannel：
+```
+kubectl run --image busybox:1.28 pingtest --restart=Never --rm -it -- ping <ip-address>
+```
+将<ip-address>替换为要测试的IP地址。这将在Kubernetes集群中创建一个临时的busybox容器，并在其中运行ping命令以测试网络连接性。如果一切正常，您应该能够ping通指定的IP地址。
+
+有个问题：Flannel需要配置容器，Cni0的IP，IP哪里来的，谁来管理这些IP，谁负责配置宿主机的路由规则？
+
+当Flannel启动时，Flannel将为集群中的每个节点分配一个唯一的子网，并为每个Pod分配一个唯一的IP地址。Flannel通过Etcd和宿主机上的flanneld来维护路由信息和配置IP信息，具体的实现我们不需要了解。
+
+
+## 总结
+1. Flannel是基于规则：`<目的容器IP地址段> via <网关的IP地址> dev eth0`来转发网络数据。
+2. k8s的集群中所有的节点能互联的话，Flannel必须为节点都创建到其他节点的路由规则。
+3. Flannel使用Etcd来维护和管理集群IP。
